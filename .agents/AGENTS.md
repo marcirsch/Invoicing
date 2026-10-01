@@ -6,7 +6,7 @@ Repository guidance for Codex and other coding agents working on the invoicing a
 
 This repository is planning a local desktop invoicing app for a small Swiss service business. The app will edit invoices, manage customers through a human-readable CSV, preview multi-page output, and generate an archived PDF with a Swiss QR-bill as its last page.
 
-**Current state:** This is a documentation-only repository. No application source, package manifest, build scripts, or test suite exists yet. Treat the architecture and structure below as planned direction, not as implemented facts.
+**Current state:** Phase 1 foundation is implemented. Invoice editing, PDF output, and QR-bill generation remain future phases.
 
 The product requirements and decisions are documented in [.codex/PRD.md](../.codex/PRD.md). The sample layout is [example_invoice.pdf](../example_invoice.pdf).
 
@@ -26,7 +26,7 @@ Select and pin compatible dependency versions when implementing the app; no vers
 
 ## Commands
 
-No development, build, test, or lint commands exist yet. Once the application is scaffolded, document the actual package scripts here and use those scripts for validation. Do not invent commands or report checks as passing when they have not been run.
+Use `npm run dev`, `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`, and `npm run build` for development and validation.
 
 ## Planned Structure
 
