@@ -248,7 +248,85 @@ td {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
 }
+.invoice-workspace {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(300px, 0.9fr);
+  align-items: start;
+  gap: 1rem;
+}
+.invoice-editor {
+  min-width: 0;
+}
+.invoice-editor h3 {
+  margin: 1.4rem 0 0.7rem;
+}
+.invoice-editor textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+.invoice-paper {
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  overflow: auto;
+  padding: 9%;
+  background: #fff;
+  color: #17202b;
+  border: 1px solid #dce1e6;
+  box-shadow: 0 8px 24px rgb(15 25 40 / 12%);
+  font-size: clamp(9px, 0.9vw, 13px);
+}
+.invoice-paper.simple {
+  font-family: Georgia, serif;
+}
+.invoice-paper header {
+  display: flex;
+  justify-content: space-between;
+  min-height: 20%;
+}
+.invoice-paper header h2 {
+  margin: 0;
+  color: #245fce;
+}
+.invoice-paper p {
+  line-height: 1.5;
+}
+.invoice-paper > p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+.invoice-paper table {
+  font-size: inherit;
+}
+.invoice-paper th,
+.invoice-paper td {
+  padding: 0.6em 0.35em;
+  border-bottom: 1px solid #dce1e6;
+}
+.invoice-paper th {
+  color: #596675;
+}
+.preview-customer {
+  min-height: 20%;
+}
+.preview-total {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2rem;
+  padding: 1rem 0.35rem;
+  border-top: 2px solid #17202b;
+}
+@media print {
+  .invoice-paper {
+    box-shadow: none;
+    border: 0;
+  }
+}
 @media (max-width: 680px) {
+  .invoice-workspace {
+    grid-template-columns: 1fr;
+  }
   .app-header,
   .section-heading,
   .error-banner,

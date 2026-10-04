@@ -6,7 +6,7 @@ Repository guidance for Codex and other coding agents working on the invoicing a
 
 This repository is planning a local desktop invoicing app for a small Swiss service business. The app will edit invoices, manage customers through a human-readable CSV, preview multi-page output, and generate an archived PDF with a Swiss QR-bill as its last page.
 
-**Current state:** Phase 1 foundation and settings are implemented. Invoice editing, PDF output, and QR-bill generation remain future phases.
+**Current state:** Phase 1 foundation and settings plus an initial Phase 2 invoice draft editor, decimal-safe totals, date-only due dates, local draft persistence, and a screen preview are implemented. Invoice issuance, PDF archival, and Swiss QR-bill generation remain Phase 3.
 
 The product requirements and decisions are documented in [.codex/PRD.md](../.codex/PRD.md). The sample layout is [example_invoice.pdf](../example_invoice.pdf).
 
@@ -17,6 +17,7 @@ The product requirements and decisions are documented in [.codex/PRD.md](../.cod
 | Electron 44 | Local macOS and Windows desktop shell |
 | TypeScript 5, React 18, Electron Vite 5 | Phase 1 UI, process boundaries, and local services |
 | `zod` 3 | Runtime validation for settings and user input |
+| `decimal.js` 10.6 | Decimal-safe draft invoice line calculations |
 | `csv-parse` 7, `csv-stringify` 6 | Customer CSV parsing and serialization |
 | Vitest 4, ESLint 9, Prettier 3 | Tests, linting, and formatting |
 | HTML/CSS with Chromium | Future invoice preview and invoice PDF rendering |
@@ -42,6 +43,7 @@ Current scripts: `npm run dev`, `npm run build`, `npm run smoke`, `npm run typec
 - Keep the customer CSV as the source of truth. Preserve existing and unknown columns, detect external edits before writing, and avoid silent data loss.
 - Store company settings, the single active draft, and invoice archive metadata locally. Save final PDFs to the user-selected archive folder.
 - Treat the structured invoice model as the source of truth. Use decimal-safe calculations; never calculate totals from formatted display strings.
+- Keep draft dates as ISO date-only strings. Round each valid line to cents half-up before summing; drafts do not reserve invoice numbers.
 - Keep the editor as the place where values change. Clicking an editable preview field should focus its corresponding editor control; calculated totals and the generated QR graphic are display-only.
 - Keep the invoice preview sheet and exported PDF styled by the selected invoice template, independent of the app's System/Light/Dark appearance.
 - Assign an invoice number only when generating an invoice. Preserve issued snapshots and PDFs; corrections use a replacement invoice with a new number.

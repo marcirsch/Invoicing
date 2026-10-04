@@ -1,5 +1,28 @@
-export interface Invoice {
+import type { Address } from './address';
+import type { Customer } from './customer';
+import type { CompanySettings } from './companySettings';
+
+export type InvoiceCurrency = 'CHF' | 'EUR';
+export type InvoiceTemplate = 'classic' | 'simple';
+export interface InvoiceLineItem {
   id: string;
-  customerId: string;
-  currency: 'CHF' | 'EUR';
+  description: string;
+  hours: string;
+  rate: string;
 }
+export interface InvoiceDraft {
+  id: string;
+  invoiceDate: string;
+  dueDate: string;
+  currency: InvoiceCurrency;
+  suggestedNumber: string;
+  customerId: string | null;
+  customer: Customer | null;
+  sender: CompanySettings;
+  lines: InvoiceLineItem[];
+  template: InvoiceTemplate;
+  notes: string;
+}
+export type InvoiceField =
+  'description' | 'hours' | 'rate' | 'invoiceDate' | 'dueDate' | 'customer';
+export type InvoiceAddress = Address;

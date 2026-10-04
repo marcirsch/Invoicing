@@ -6,7 +6,7 @@ The planned app will run on macOS and Windows. It will let users manage customer
 
 ## Current status
 
-Phase 1 foundation and settings are implemented: Electron main/preload/renderer boundaries, typed shared models, local settings persistence, and CSV customer workflows are available. Invoice editing, PDF output, and QR-bill generation remain future phases.
+Phase 1 foundation and settings plus initial Phase 2 draft editing are implemented: invoice drafts use decimal-safe line calculations, date-only dates, local autosave/restore, customer selection, and a fixed-light on-screen preview. Invoice issuance, PDF archival, and Swiss QR-bill generation remain Phase 3.
 
 ## Planned technology
 
@@ -14,6 +14,7 @@ Phase 1 foundation and settings are implemented: Electron main/preload/renderer 
 - HTML and CSS for the invoice preview and invoice PDF pages
 - `swissqrbill` and PDFKit for Swiss QR-bill generation
 - Local application storage for settings, the active draft, and issued-invoice metadata
+- `decimal.js` for exact draft calculations (each line rounded half-up to cents before summing)
 - A user-selected CSV file as the customer source of truth
 
 ## Phase 1
@@ -26,7 +27,11 @@ Phase 1 establishes the desktop foundation and local data workflow:
 - Customer CSV selection, parsing, validation, preservation of unknown columns, and external-edit conflict detection
 - Customer list and create, edit, and delete workflows
 
-Invoice editing, live preview, PDF generation, and QR-bills are planned for later phases.
+## Phase 2 draft workspace
+
+The app provides one editable invoice draft with customer and company snapshots, date and currency controls, stable-ID service rows, a suggested number that does not advance settings, debounced local persistence, and a screen preview. Draft dates use `YYYY-MM-DD`; due dates use calendar-day arithmetic. The `classic` and `simple` choices currently share an early preview layout. Full page pagination and preview-to-editor keyboard navigation are not implemented yet. The preview is not a PDF and contains no QR-bill.
+
+Phase 3 will add validated issuance, immutable snapshots, PDF archival, and a compliant Swiss QR-bill. Draft data is stored separately in `invoice-draft.json`; malformed saved data is retained and reported instead of silently replaced.
 
 ## Documentation
 

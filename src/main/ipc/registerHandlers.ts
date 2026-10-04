@@ -6,6 +6,8 @@ import { CustomerCsvService } from '../services/customerCsvService';
 import { SettingsStore } from '../services/settingsStore';
 import { registerCustomerHandlers } from './customerHandlers';
 import { registerSettingsHandlers } from './settingsHandlers';
+import { DraftStore } from '../services/draftStore';
+import { invoiceDraftSchema } from '../../shared/validation/invoiceValidation';
 
 function safeFailure(error: unknown, fallback: string) {
   if (error instanceof z.ZodError)
@@ -25,6 +27,11 @@ function safeFailure(error: unknown, fallback: string) {
           'The CSV delimiter is unclear. Choose the character used to separate columns.',
       },
     };
+  if (error instanceof Error && /saved invoice draft/.test(error.message))
+    return {
+      ok: false,
+      error: { code: 'draft_recovery', message: error.message },
+    };
   if (error instanceof Error && /changed outside the app/.test(error.message))
     return { ok: false, error: { code: 'conflict', message: error.message } };
   if (
@@ -40,6 +47,7 @@ function safeFailure(error: unknown, fallback: string) {
 export function registerHandlers(
   store: SettingsStore,
   customers: CustomerCsvService,
+  drafts: DraftStore,
 ): void {
   const register = (
     channel: string,
@@ -78,6 +86,10 @@ export function registerHandlers(
     customers,
     loadCsv,
     () => pendingCsvPath,
+  );
+  register('draft:load', async () => drafts.load());
+  register('draft:save', async (_event, payload) =>
+    drafts.save(invoiceDraftSchema.parse(payload)),
   );
 }
 

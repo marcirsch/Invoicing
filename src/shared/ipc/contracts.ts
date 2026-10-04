@@ -1,6 +1,7 @@
 import type { Customer } from '../domain/customer';
 import type { Settings } from '../domain/settings';
 import type { CsvDelimiter } from '../csv/dialect';
+import type { InvoiceDraft } from '../domain/invoice';
 export interface StructuredError {
   code: string;
   message: string;
@@ -8,6 +9,8 @@ export interface StructuredError {
 export type Result<T> =
   { ok: true; value: T } | { ok: false; error: StructuredError };
 export interface IpcApi {
+  loadDraft(): Promise<Result<InvoiceDraft | null>>;
+  saveDraft(draft: InvoiceDraft): Promise<Result<InvoiceDraft>>;
   getSettings(): Promise<Result<Settings>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   selectCsv(): Promise<Result<string | null>>;

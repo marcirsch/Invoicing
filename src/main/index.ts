@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { registerHandlers } from './ipc/registerHandlers';
 import { SettingsStore } from './services/settingsStore';
 import { CustomerCsvService } from './services/customerCsvService';
+import { DraftStore } from './services/draftStore';
 function createWindow(): void {
   const rendererFile = pathToFileURL(
     path.join(__dirname, '../renderer/index.html'),
@@ -67,7 +68,11 @@ app.whenReady().then(() => {
   void store.load().then((settings) => {
     nativeTheme.themeSource = settings.appearance;
   });
-  registerHandlers(store, new CustomerCsvService());
+  registerHandlers(
+    store,
+    new CustomerCsvService(),
+    new DraftStore(app.getPath('userData')),
+  );
   createWindow();
   app.on('activate', () => {
     if (!BrowserWindow.getAllWindows().length) createWindow();

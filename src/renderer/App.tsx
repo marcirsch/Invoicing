@@ -7,8 +7,10 @@ import { ErrorMessage } from './components/ErrorMessage';
 import { SettingsForm } from './components/SettingsForm';
 import { useCustomers } from './hooks/useCustomers';
 import { useSettings } from './hooks/useSettings';
+import { useInvoiceDraft } from './hooks/useInvoiceDraft';
+import { InvoiceWorkspace } from './components/InvoiceWorkspace';
 
-type Page = 'customers' | 'settings';
+type Page = 'customers' | 'settings' | 'invoice';
 export default function App(): JSX.Element {
   const [page, setPage] = useState<Page>('customers');
   const [editing, setEditing] = useState<Customer | null | undefined>(
@@ -16,6 +18,11 @@ export default function App(): JSX.Element {
   );
   const settings = useSettings();
   const customerState = useCustomers();
+  const invoice = useInvoiceDraft(
+    settings.settings,
+    customerState.customers,
+    !settings.loading && !customerState.loading,
+  );
   useEffect(() => {
     if (settings.loading) return;
     if (settings.settings.appearance === 'system')
@@ -99,7 +106,15 @@ export default function App(): JSX.Element {
           </div>
         </section>
       )}
-      {page === 'settings' ? (
+      {page === 'invoice' ? (
+        <InvoiceWorkspace
+          draft={invoice.draft}
+          customers={customerState.customers}
+          onChange={invoice.update}
+          onAddLine={invoice.addLine}
+          error={invoice.error}
+        />
+      ) : page === 'settings' ? (
         <SettingsForm
           settings={settings.settings}
           loading={settings.loading}

@@ -2,8 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcApi, Result } from '../shared/ipc/contracts';
 import type { Customer } from '../shared/domain/customer';
 import type { Settings } from '../shared/domain/settings';
+import type { InvoiceDraft } from '../shared/domain/invoice';
 
 const api: IpcApi = {
+  loadDraft: () =>
+    ipcRenderer.invoke('draft:load') as Promise<Result<InvoiceDraft | null>>,
+  saveDraft: (draft) =>
+    ipcRenderer.invoke('draft:save', draft) as Promise<Result<InvoiceDraft>>,
   getSettings: () =>
     ipcRenderer.invoke('settings:get') as Promise<Result<Settings>>,
   saveSettings: (settings) =>
