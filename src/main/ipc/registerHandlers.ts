@@ -1,57 +1,90 @@
 import { ipcMain } from 'electron';
+import { z } from 'zod';
+import type { CsvDelimiter } from '../../shared/csv/dialect';
 import { validateIpcSender } from '../security/validateIpcSender';
-import type { Settings } from '../../shared/domain/settings';
-import { SettingsStore } from '../services/settingsStore';
 import { CustomerCsvService } from '../services/customerCsvService';
+import { SettingsStore } from '../services/settingsStore';
+import { registerCustomerHandlers } from './customerHandlers';
+import { registerSettingsHandlers } from './settingsHandlers';
+
+function safeFailure(error: unknown, fallback: string) {
+  if (error instanceof z.ZodError)
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_input',
+        message: 'Some fields are invalid. Check the form and try again.',
+      },
+    };
+  if (error instanceof Error && /delimiter is ambiguous/.test(error.message))
+    return {
+      ok: false,
+      error: {
+        code: 'dialect_ambiguous',
+        message:
+          'The CSV delimiter is unclear. Choose the character used to separate columns.',
+      },
+    };
+  if (error instanceof Error && /changed outside the app/.test(error.message))
+    return { ok: false, error: { code: 'conflict', message: error.message } };
+  if (
+    error instanceof Error &&
+    /^(Select a customer|Choose a customer|The customer CSV|CSV is missing|required columns|CSV contains duplicate|CSV customer records|This file is not valid|CSV content|CSV rows)/.test(
+      error.message,
+    )
+  )
+    return { ok: false, error: { code: 'data_error', message: error.message } };
+  return { ok: false, error: { code: 'operation_failed', message: fallback } };
+}
+
 export function registerHandlers(
   store: SettingsStore,
   customers: CustomerCsvService,
 ): void {
-  const wrap =
-    (fn: (...args: unknown[]) => Promise<unknown>) =>
-    async (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => {
+  const register = (
+    channel: string,
+    operation: (
+      event: Electron.IpcMainInvokeEvent,
+      ...args: unknown[]
+    ) => Promise<unknown>,
+  ) => {
+    ipcMain.handle(channel, async (event, ...args: unknown[]) => {
       try {
         validateIpcSender(event);
-        return { ok: true, value: await fn(...args) };
+        return { ok: true, value: await operation(event, ...args) };
       } catch (error) {
-        return {
-          ok: false,
-          error: {
-            code: 'operation_failed',
-            message:
-              error instanceof Error ? error.message : 'Operation failed.',
-          },
-        };
+        const fallback = channel.startsWith('customers:')
+          ? 'Could not complete the customer operation. Check the selected file and its permissions.'
+          : 'Could not read or save settings.';
+        return safeFailure(error, fallback);
       }
-    };
-  ipcMain.handle(
-    'settings:get',
-    wrap(() => store.load()),
-  );
-  ipcMain.handle(
-    'settings:save',
-    wrap((s) => store.save(s as Settings)),
-  );
-  ipcMain.handle(
-    'customers:load',
-    wrap(async (p) => customers.load(String(p))),
-  );
-  ipcMain.handle(
-    'customers:list',
-    wrap(() => Promise.resolve(customers.customers())),
-  );
-  ipcMain.handle(
-    'customers:save',
-    wrap(async (c) => {
-      await customers.save(c as never);
-      return c;
-    }),
-  );
-  ipcMain.handle(
-    'customers:delete',
-    wrap(async (id) => {
-      await customers.delete(String(id));
-      return undefined;
-    }),
+    });
+  };
+  let pendingCsvPath: string | null = null;
+  const loadCsv = async (filePath: string, delimiter?: CsvDelimiter) => {
+    const loaded = await customers.load(filePath, delimiter);
+    const settings = await store.load();
+    if (settings.csvPath !== filePath)
+      await store.savePreferences({ ...settings, csvPath: filePath });
+    pendingCsvPath = null;
+    return loaded;
+  };
+  registerSettingsHandlers(register, store, loadCsv, (path) => {
+    pendingCsvPath = path;
+  });
+  registerCustomerHandlers(
+    register,
+    store,
+    customers,
+    loadCsv,
+    () => pendingCsvPath,
   );
 }
+
+export type HandlerRegistrar = (
+  channel: string,
+  operation: (
+    event: Electron.IpcMainInvokeEvent,
+    ...args: unknown[]
+  ) => Promise<unknown>,
+) => void;

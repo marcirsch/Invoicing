@@ -1,3 +1,18 @@
-export function ErrorMessage({ message }: { message: string }): JSX.Element {
-  return <p role="alert">{message}</p>;
+export function ErrorMessage({
+  message,
+  onReload,
+}: {
+  message: string;
+  onReload?: () => void;
+}): JSX.Element {
+  return (
+    <div className="error-banner" role="alert">
+      <p>{message}</p>
+      {onReload && (
+        <button type="button" className="secondary" onClick={onReload}>
+          Reload CSV
+        </button>
+      )}
+    </div>
+  );
 }

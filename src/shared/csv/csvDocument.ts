@@ -33,5 +33,11 @@ export function serializeCsv(document: CsvDocument): string {
     record_delimiter: document.dialect.lineEnding,
     quoted: false,
   });
-  return (document.dialect.bom ? '\ufeff' : '') + output;
+  const withoutFinalNewline = output.endsWith(document.dialect.lineEnding)
+    ? output.slice(0, -document.dialect.lineEnding.length)
+    : output;
+  const serialized = document.dialect.finalNewline
+    ? withoutFinalNewline + document.dialect.lineEnding
+    : withoutFinalNewline;
+  return (document.dialect.bom ? '\ufeff' : '') + serialized;
 }

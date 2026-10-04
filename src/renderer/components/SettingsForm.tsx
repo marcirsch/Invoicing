@@ -1,8 +1,246 @@
-export function SettingsForm(): JSX.Element {
+import { useState } from 'react';
+import type { Settings } from '../../shared/domain/settings';
+import { settingsSchema } from '../../shared/validation/settingsValidation';
+
+interface Props {
+  settings: Settings;
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  onChange(settings: Settings): void;
+  onSave(): Promise<boolean>;
+  onSelectCsv(): void;
+  onSelectArchive(): void;
+}
+export function SettingsForm({
+  settings,
+  loading,
+  saving,
+  error,
+  onChange,
+  onSave,
+  onSelectCsv,
+  onSelectArchive,
+}: Props): JSX.Element {
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const field = (
+    label: string,
+    id: string,
+    value: string | number,
+    change: (value: string) => void,
+    type = 'text',
+  ) => (
+    <label className="field" htmlFor={id}>
+      {label}
+      <input
+        id={id}
+        type={type}
+        value={value}
+        aria-invalid={Boolean(errors[id])}
+        aria-describedby={errors[id] ? `${id}-error` : undefined}
+        onChange={(event) => change(event.target.value)}
+      />
+      {errors[id] && (
+        <span className="field-error" id={`${id}-error`}>
+          {errors[id]}
+        </span>
+      )}
+    </label>
+  );
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const result = settingsSchema.safeParse(settings);
+    if (!result.success) {
+      const ids: Record<string, string> = {
+        'company.name': 'company-name',
+        'company.address.street': 'company-street',
+        'company.address.buildingNumber': 'company-building',
+        'company.address.postalCode': 'company-postal',
+        'company.address.city': 'company-city',
+        'company.address.country': 'company-country',
+        'company.phone': 'company-phone',
+        'company.email': 'company-email',
+        paymentTermDays: 'payment-days',
+        invoicePrefix: 'invoice-prefix',
+        invoiceYear: 'invoice-year',
+        nextSequence: 'invoice-sequence',
+      };
+      const next: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const path = issue.path.join('.');
+        const id = ids[path];
+        if (id) next[id] = issue.message;
+      }
+      setErrors(next);
+      document.getElementById(Object.keys(next)[0] ?? '')?.focus();
+      return;
+    }
+    setErrors({});
+    await onSave();
+  }
+  const company = (key: keyof Settings['company'], value: string) =>
+    onChange({ ...settings, company: { ...settings.company, [key]: value } });
+  const address = (key: keyof Settings['company']['address'], value: string) =>
+    onChange({
+      ...settings,
+      company: {
+        ...settings.company,
+        address: { ...settings.company.address, [key]: value },
+      },
+    });
   return (
-    <section>
-      <h2>Settings</h2>
-      <p>Company and invoice defaults</p>
-    </section>
+    <form
+      className="panel"
+      aria-busy={loading}
+      onSubmit={(event) => void submit(event)}
+    >
+      <h2>Company and invoice settings</h2>
+      {error && (
+        <p role="alert" className="error-text">
+          {error}
+        </p>
+      )}
+      <fieldset disabled={loading || saving}>
+        <legend>Company details</legend>
+        <div className="form-grid">
+          {field(
+            'Company name',
+            'company-name',
+            settings.company.name,
+            (value) => company('name', value),
+          )}
+          {field(
+            'Street',
+            'company-street',
+            settings.company.address.street,
+            (value) => address('street', value),
+          )}
+          {field(
+            'Building number',
+            'company-building',
+            settings.company.address.buildingNumber,
+            (value) => address('buildingNumber', value),
+          )}
+          {field(
+            'Postal code',
+            'company-postal',
+            settings.company.address.postalCode,
+            (value) => address('postalCode', value),
+          )}
+          {field(
+            'City',
+            'company-city',
+            settings.company.address.city,
+            (value) => address('city', value),
+          )}
+          {field(
+            'Country',
+            'company-country',
+            settings.company.address.country,
+            (value) => address('country', value),
+          )}
+          {field(
+            'Phone',
+            'company-phone',
+            settings.company.phone,
+            (value) => company('phone', value),
+            'tel',
+          )}
+          {field(
+            'Email',
+            'company-email',
+            settings.company.email,
+            (value) => company('email', value),
+            'email',
+          )}
+        </div>
+      </fieldset>
+      <fieldset disabled={loading || saving}>
+        <legend>Invoice defaults</legend>
+        <div className="form-grid">
+          <label className="field" htmlFor="currency">
+            Default currency
+            <select
+              id="currency"
+              value={settings.currency}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  currency: event.target.value as Settings['currency'],
+                })
+              }
+            >
+              <option value="CHF">CHF</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </label>
+          {field(
+            'Payment term (days)',
+            'payment-days',
+            settings.paymentTermDays,
+            (value) =>
+              onChange({ ...settings, paymentTermDays: Number(value) }),
+            'number',
+          )}
+          {field(
+            'Invoice prefix',
+            'invoice-prefix',
+            settings.invoicePrefix,
+            (value) => onChange({ ...settings, invoicePrefix: value }),
+          )}
+          {field(
+            'Invoice year',
+            'invoice-year',
+            settings.invoiceYear,
+            (value) => onChange({ ...settings, invoiceYear: value }),
+          )}
+          {field(
+            'Next sequence number',
+            'invoice-sequence',
+            settings.nextSequence,
+            (value) => onChange({ ...settings, nextSequence: Number(value) }),
+            'number',
+          )}
+          {field('Template', 'invoice-template', settings.template, (value) =>
+            onChange({ ...settings, template: value }),
+          )}
+          <label className="field" htmlFor="appearance">
+            App appearance
+            <select
+              id="appearance"
+              value={settings.appearance}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  appearance: event.target.value as Settings['appearance'],
+                })
+              }
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset disabled={loading || saving}>
+        <legend>Local data folders</legend>
+        <div className="path-setting">
+          <span>Customer CSV: {settings.csvPath ?? 'Not selected'}</span>
+          <button type="button" className="secondary" onClick={onSelectCsv}>
+            Choose CSV…
+          </button>
+        </div>
+        <div className="path-setting">
+          <span>Archive folder: {settings.archivePath ?? 'Not selected'}</span>
+          <button type="button" className="secondary" onClick={onSelectArchive}>
+            Choose folder…
+          </button>
+        </div>
+      </fieldset>
+      <button type="submit" disabled={loading || saving}>
+        {saving ? 'Saving…' : 'Save settings'}
+      </button>
+    </form>
   );
 }

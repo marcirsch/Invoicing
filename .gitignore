@@ -1,2 +1,4 @@
-example_invoice.pdf
 node_modules/
+out/
+dist/
+e2e-screenshots/

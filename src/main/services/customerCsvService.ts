@@ -6,8 +6,10 @@ import {
   serializeCsv,
   type CsvDocument,
 } from '../../shared/csv/csvDocument';
-import { detectDialect } from '../../shared/csv/dialect';
+import { detectDialect, type CsvDelimiter } from '../../shared/csv/dialect';
 import type { Customer } from '../../shared/domain/customer';
+import { customerSchema } from '../../shared/validation/customerValidation';
+
 const fields = [
   'id',
   'name',
@@ -19,87 +21,233 @@ const fields = [
   'city',
   'country',
 ] as const;
+type Field = (typeof fields)[number];
+interface FileIdentity {
+  dev: number;
+  ino: number;
+}
+
+/** Maintains one selected customer CSV and guards every mutation with its loaded fingerprint. */
 export class CustomerCsvService {
   private document?: CsvDocument;
   private fingerprint?: string;
+  private identity?: FileIdentity;
   private sourcePath?: string;
-  async load(filePath: string): Promise<Customer[]> {
-    const text = await fs.readFile(filePath, 'utf8');
-    this.document = parseCsv(text, detectDialect(text));
-    this.sourcePath = filePath;
-    this.fingerprint = hash(text);
+  private selectedDelimiter?: CsvDelimiter;
+
+  async load(
+    filePath: string,
+    selectedDelimiter?: CsvDelimiter,
+  ): Promise<Customer[]> {
+    const bytes = await fs.readFile(filePath);
+    const text = bytes.toString('utf8');
+    if (!Buffer.from(text, 'utf8').equals(bytes))
+      throw new Error(
+        'This file is not valid UTF-8. The original was left unchanged.',
+      );
+    const resolvedPath = path.resolve(filePath);
+    const effectiveDelimiter =
+      selectedDelimiter ??
+      (this.sourcePath === resolvedPath ? this.selectedDelimiter : undefined);
+    const dialect = detectDialect(text, effectiveDelimiter);
+    const document = parseCsv(text, dialect);
+    const normalizedHeaders = document.headers.map((header) =>
+      header.trim().toLowerCase(),
+    );
+    const missing = fields.filter(
+      (field) => !normalizedHeaders.includes(field.toLowerCase()),
+    );
+    if (missing.length)
+      throw new Error(
+        `CSV is missing required columns: ${missing.join(', ')}. Add or map these columns before using it.`,
+      );
+    if (new Set(normalizedHeaders).size !== normalizedHeaders.length)
+      throw new Error(
+        'CSV contains duplicate column names. Rename duplicates before loading it.',
+      );
+    const idColumn = normalizedHeaders.indexOf('id');
+    const mappedIndexes = fields.map((field) =>
+      normalizedHeaders.indexOf(field.toLowerCase()),
+    );
+    const customerRows = document.rows.filter((row) =>
+      mappedIndexes.some((index) => cell(row, index) !== ''),
+    );
+    if (customerRows.some((row) => !cell(row, idColumn)))
+      throw new Error(
+        'CSV customer records need nonempty IDs. Add unique IDs before loading the file.',
+      );
+    if (
+      new Set(customerRows.map((row) => cell(row, idColumn))).size !==
+      customerRows.length
+    )
+      throw new Error(
+        'CSV contains duplicate customer IDs. Correct them before loading it.',
+      );
+    const stat = await fs.stat(filePath);
+    this.document = document;
+    this.sourcePath = resolvedPath;
+    this.selectedDelimiter = dialect.delimiter;
+    this.fingerprint = hash(bytes);
+    this.identity = { dev: stat.dev, ino: stat.ino };
     return this.toCustomers();
   }
+
+  private columnIndexes(): Record<Field, number> {
+    if (!this.document) throw new Error('Select a customer CSV file first.');
+    return Object.fromEntries(
+      fields.map((field) => [
+        field,
+        this.document!.headers.findIndex(
+          (header) => header.trim().toLowerCase() === field.toLowerCase(),
+        ),
+      ]),
+    ) as Record<Field, number>;
+  }
+
   private toCustomers(): Customer[] {
     if (!this.document) return [];
-    const index = Object.fromEntries(
-      fields.map((f) => [f, this.document!.headers.indexOf(f)]),
-    );
-    return this.document.rows.map((row, i) => ({
-      id: val(row, index.id) || String(i + 1),
-      name: val(row, index.name),
-      email: val(row, index.email),
-      phone: val(row, index.phone),
-      address: {
-        street: val(row, index.street),
-        buildingNumber: val(row, index.buildingNumber),
-        postalCode: val(row, index.postalCode),
-        city: val(row, index.city),
-        country: val(row, index.country),
-      },
-    }));
+    const indexes = this.columnIndexes();
+    return this.document.rows
+      .filter((row) => fields.some((field) => cell(row, indexes[field]) !== ''))
+      .map((row) => ({
+        id: cell(row, indexes.id),
+        name: cell(row, indexes.name),
+        email: cell(row, indexes.email),
+        phone: cell(row, indexes.phone),
+        address: {
+          street: cell(row, indexes.street),
+          buildingNumber: cell(row, indexes.buildingNumber),
+          postalCode: cell(row, indexes.postalCode),
+          city: cell(row, indexes.city),
+          country: cell(row, indexes.country),
+        },
+      }));
   }
-  async save(customer: Customer): Promise<void> {
-    if (!this.document || !this.sourcePath || !this.fingerprint)
-      throw new Error('No customer CSV is loaded.');
-    const current = hash(await fs.readFile(this.sourcePath, 'utf8'));
-    if (current !== this.fingerprint)
-      throw new Error(
-        'The customer CSV changed externally. Reload it before saving.',
-      );
-    const indexes = Object.fromEntries(
-      fields.map((f) => [f, this.document!.headers.indexOf(f)]),
+
+  async save(input: Customer): Promise<Customer[]> {
+    const customer = customerSchema.parse(input);
+    await this.assertUnchanged();
+    const indexes = this.columnIndexes();
+    const rowIndex = this.document!.rows.findIndex(
+      (row) => cell(row, indexes.id) === customer.id,
     );
-    let row = this.document.rows.find(
-      (r) => val(r, indexes.id) === customer.id,
-    );
-    if (!row) {
-      row = new Array(this.document.headers.length).fill('');
-      this.document.rows.push(row);
-    }
-    const values = {
+    const values: Record<Field, string> = {
       id: customer.id,
       name: customer.name,
       email: customer.email,
       phone: customer.phone,
-      ...customer.address,
+      street: customer.address.street,
+      buildingNumber: customer.address.buildingNumber,
+      postalCode: customer.address.postalCode,
+      city: customer.address.city,
+      country: customer.address.country,
     };
-    for (const field of fields) {
-      const index = indexes[field];
-      if (index >= 0) row[index] = values[field];
-    }
-    await this.replace();
+    const row =
+      rowIndex < 0
+        ? new Array(this.document!.headers.length).fill('')
+        : [...this.document!.rows[rowIndex]!];
+    for (const field of fields) row[indexes[field]] = values[field];
+    const nextRows = [...this.document!.rows];
+    if (rowIndex < 0) nextRows.push(row);
+    else nextRows[rowIndex] = row;
+    await this.writeRows(nextRows);
+    return this.toCustomers();
   }
-  async delete(id: string): Promise<void> {
-    if (!this.document) throw new Error('No customer CSV is loaded.');
-    const index = this.document.headers.indexOf('id');
-    this.document.rows = this.document.rows.filter((r) => val(r, index) !== id);
-    await this.replace();
+
+  async delete(id: string): Promise<Customer[]> {
+    if (!id) throw new Error('Choose a customer to delete.');
+    await this.assertUnchanged();
+    const indexes = this.columnIndexes();
+    const nextRows = this.document!.rows.filter(
+      (row) => cell(row, indexes.id) !== id,
+    );
+    if (nextRows.length === this.document!.rows.length)
+      throw new Error(
+        'That customer no longer exists. Reload the CSV and try again.',
+      );
+    await this.writeRows(nextRows);
+    return this.toCustomers();
   }
-  private async replace(): Promise<void> {
-    const output = serializeCsv(this.document!);
-    const temp = `${this.sourcePath!}.${crypto.randomUUID()}.tmp`;
-    await fs.writeFile(temp, output, 'utf8');
-    await fs.rename(temp, this.sourcePath!);
-    this.fingerprint = hash(output);
-  }
+
   customers(): Customer[] {
     return this.toCustomers();
   }
+  get path(): string | null {
+    return this.sourcePath ?? null;
+  }
+
+  private async assertUnchanged(): Promise<void> {
+    if (
+      !this.document ||
+      !this.sourcePath ||
+      !this.fingerprint ||
+      !this.identity
+    )
+      throw new Error('Select a customer CSV file first.');
+    const [bytes, stat] = await Promise.all([
+      fs.readFile(this.sourcePath),
+      fs.stat(this.sourcePath),
+    ]);
+    if (
+      stat.dev !== this.identity.dev ||
+      stat.ino !== this.identity.ino ||
+      hash(bytes) !== this.fingerprint
+    ) {
+      throw new Error(
+        'The customer CSV changed outside the app. Reload it before saving; your unsaved changes are still available.',
+      );
+    }
+  }
+
+  private async writeRows(rows: string[][]): Promise<void> {
+    const nextDocument: CsvDocument = { ...this.document!, rows };
+    const output = serializeCsv(nextDocument);
+    const target = this.sourcePath!;
+    const temp = path.join(
+      path.dirname(target),
+      `.${path.basename(target)}.${crypto.randomUUID()}.tmp`,
+    );
+    const backup = `${target}.phase1-backup`;
+    const original = await fs.readFile(target);
+    const mode = (await fs.stat(target)).mode;
+    let transientOriginal: string | undefined;
+    try {
+      try {
+        await fs.access(backup);
+      } catch {
+        await fs.writeFile(backup, original, { mode });
+      }
+      await fs.writeFile(temp, output, { encoding: 'utf8', mode });
+      if (process.platform === 'win32') {
+        transientOriginal = `${target}.${crypto.randomUUID()}.old`;
+        await fs.rename(target, transientOriginal);
+        try {
+          await fs.rename(temp, target);
+        } catch (error) {
+          await fs.rename(transientOriginal, target);
+          transientOriginal = undefined;
+          throw error;
+        }
+        await fs.unlink(transientOriginal);
+      } else {
+        await fs.rename(temp, target);
+      }
+      const stat = await fs.stat(target);
+      this.document = nextDocument;
+      this.fingerprint = hash(Buffer.from(output, 'utf8'));
+      this.identity = { dev: stat.dev, ino: stat.ino };
+    } catch (error) {
+      await fs.rm(temp, { force: true }).catch(() => undefined);
+      if (transientOriginal)
+        await fs.rename(transientOriginal, target).catch(() => undefined);
+      throw error;
+    }
+  }
 }
-function val(row: string[], index: number): string {
-  return index >= 0 ? (row[index] ?? '') : '';
+
+function cell(row: string[], index: number): string {
+  return row[index] ?? '';
 }
-function hash(input: string): string {
+function hash(input: Uint8Array): string {
   return crypto.createHash('sha256').update(input).digest('hex');
 }

@@ -311,17 +311,23 @@ At each size, verify no clipped controls, horizontal scrolling, overlapping dial
 
 ## Acceptance criteria
 
-- [ ] Electron app launches in development mode.
-- [ ] Renderer has no direct Node.js or filesystem access.
-- [ ] Main/preload/renderer boundaries are secured and typed.
-- [ ] Settings persist across restart and reject invalid stored data safely.
-- [ ] User can select and reload a customer CSV.
-- [ ] CSV round trips preserve supported dialect details and unknown data.
-- [ ] Customer add, edit, and delete operations work through the UI.
-- [ ] External CSV edits are detected before overwrite.
-- [ ] Write failures leave the original CSV recoverable.
-- [ ] Unit and integration tests cover the CSV preservation and conflict matrix.
-- [ ] README and AGENTS guidance describe the actual commands and structure.
+- [x] Electron app launches in development mode.
+- [x] Renderer has no direct Node.js or filesystem access.
+- [x] Main/preload/renderer boundaries are secured and typed.
+- [x] Settings persist across store reload and reject invalid stored data safely.
+- [x] User can select and reload a customer CSV.
+- [x] CSV round trips preserve supported dialect details and unknown data.
+- [x] Customer add, edit, and delete operations work through the UI.
+- [x] External CSV edits are detected before overwrite.
+- [x] Write failures leave the original CSV recoverable.
+- [x] Unit and integration tests cover the CSV preservation and conflict matrix.
+- [x] README and AGENTS guidance describe the actual commands and structure.
+
+## Validation record
+
+Phase 1 implementation and the acceptance criteria above were validated on macOS. The six validation commands passed; the test suite reports 29 passing tests. The runtime smoke test builds the production output, launches Electron, and confirms the renderer and preload bridge initialize. Manual UI checks confirmed development launch, enabled settings controls and required-field validation, loading a semicolon CSV with accents and leading-zero values, and customer add/edit/delete. An external edit was detected before overwrite; the app kept the edited form value, reloaded the external CSV change, and then saved both changes successfully.
+
+The detailed screenshot-based E2E matrix above was not fully run: screenshots at all three viewport sizes, keyboard-only traversal, malformed-file UI recovery, and an OS-level read-only-directory recovery were not captured manually. CSV dialect/error/conflict/replacement behavior is covered by automated unit and integration tests. Windows packaging and execution were not tested on this macOS host. Do not treat the full screenshot/responsive E2E matrix or Windows compatibility as verified until those checks are run.
 
 ## Risks and mitigations
 
