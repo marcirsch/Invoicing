@@ -22,21 +22,18 @@ export function assignMeasuredPages<T extends MeasuredItem>(
 ): MeasuredPages<T> {
   if (items.length === 0) return { pages: [[]], oversizedItemIds: [] };
 
-  const oversizedItemIds = items
-    .filter(
-      (item) =>
-        item.height >
-        Math.max(0, capacities.first, capacities.continuation, capacities.final),
-    )
-    .map((item) => item.id);
   const pages: T[][] = [];
   let remaining = [...items];
 
   while (remaining.length > 0) {
     const pageIndex = pages.length;
-    const remainingHeight = remaining.reduce((sum, item) => sum + item.height, 0);
+    const remainingHeight = remaining.reduce(
+      (sum, item) => sum + item.height,
+      0,
+    );
     const capacity =
-      pageIndex === 0 && remainingHeight <= (capacities.firstFinal ?? capacities.final)
+      pageIndex === 0 &&
+      remainingHeight <= (capacities.firstFinal ?? capacities.final)
         ? (capacities.firstFinal ?? capacities.final)
         : pageIndex === 0
           ? capacities.first
@@ -48,6 +45,17 @@ export function assignMeasuredPages<T extends MeasuredItem>(
 
     while (remaining.length > 0) {
       const next = remaining[0];
+      const finalCapacity =
+        pageIndex === 0
+          ? (capacities.firstFinal ?? capacities.final)
+          : capacities.final;
+      if (
+        remaining.length === 1 &&
+        page.length > 0 &&
+        used + next.height > finalCapacity
+      ) {
+        break;
+      }
       if (page.length > 0 && used + next.height > Math.max(0, capacity)) break;
       page.push(next);
       remaining = remaining.slice(1);
@@ -57,5 +65,18 @@ export function assignMeasuredPages<T extends MeasuredItem>(
     pages.push(page);
   }
 
+  const oversizedItemIds = pages.flatMap((page, pageIndex) => {
+    const pageCapacity =
+      pages.length === 1
+        ? (capacities.firstFinal ?? capacities.final)
+        : pageIndex === 0
+          ? capacities.first
+          : pageIndex === pages.length - 1
+            ? capacities.final
+            : capacities.continuation;
+    return page
+      .filter((item) => item.height > Math.max(0, pageCapacity))
+      .map((item) => item.id);
+  });
   return { pages, oversizedItemIds };
 }

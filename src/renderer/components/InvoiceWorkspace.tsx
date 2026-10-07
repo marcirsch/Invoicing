@@ -57,9 +57,6 @@ export function InvoiceWorkspace({
       const paperHeight = paper.getBoundingClientRect().height;
       const firstPage = root.querySelector<HTMLElement>('.invoice-paper');
       if (!firstPage) return;
-      const continuationPage = root.querySelector<HTMLElement>(
-        '.invoice-paper:nth-child(2)',
-      );
       const innerHeight = paperHeight * (1 - 0.072 * 2);
       const regionHeight = (selector: string, page: HTMLElement | null) =>
         page
@@ -72,12 +69,6 @@ export function InvoiceWorkspace({
         '.invoice-fixed:not(.preview-total):not(.invoice-notes)',
         firstPage,
       );
-      const continuationFixed = continuationPage
-        ? regionHeight(
-            '.invoice-continuation-header, .invoice-fixed.invoice-heading-block',
-            continuationPage,
-          )
-        : paperHeight * 0.08;
       const tableHeadingHeight =
         firstPage.querySelector('thead')?.getBoundingClientRect().height ?? 0;
       const closingPage = root.querySelector<HTMLElement>(
@@ -93,10 +84,9 @@ export function InvoiceWorkspace({
       const commonReserved = tableHeadingHeight + footerHeight;
       const capacities = {
         first: innerHeight - firstFixed - commonReserved,
-        firstFinal:
-          innerHeight - firstFixed - commonReserved - closingHeight,
-        continuation: innerHeight - continuationFixed - commonReserved,
-        final: innerHeight - continuationFixed - commonReserved - closingHeight,
+        firstFinal: innerHeight - firstFixed - commonReserved - closingHeight,
+        continuation: innerHeight - commonReserved,
+        final: innerHeight - commonReserved - closingHeight,
       };
       const assignment = assignMeasuredPages(
         draft.lines.map((line) => ({
@@ -340,7 +330,9 @@ export function InvoiceWorkspace({
         {(footerTooTall || oversizedLineIds.length > 0) && (
           <div className="invoice-layout-warning" role="alert">
             {footerTooTall && (
-              <p>The invoice footer is too tall to fit in the page footer area.</p>
+              <p>
+                The invoice footer is too tall to fit in the page footer area.
+              </p>
             )}
             {oversizedLineIds.length > 0 && (
               <p>
@@ -356,93 +348,93 @@ export function InvoiceWorkspace({
             className={`invoice-paper ${draft.template}`}
             aria-label={`Invoice preview page ${pageIndex + 1}`}
           >
-            <header
-              className={`invoice-fixed ${pageIndex > 0 ? 'invoice-continuation-header' : ''}`}
-            >
-              <div>
-                {pageIndex === 0 && (
-                  <div className="invoice-logo-space">
-                    {settingsLogo(draft.sender.logoDataUrl) && (
-                      <img
-                        className="invoice-logo"
-                        src={settingsLogo(draft.sender.logoDataUrl)!}
-                        alt="Company logo"
-                      />
-                    )}
-                  </div>
-                )}
-                <strong className="invoice-sender-name">
-                  {draft.sender.name || 'Your company'}
-                </strong>
-                <p className="invoice-sender-details">
-                  {draft.sender.address.street}{' '}
-                  {draft.sender.address.buildingNumber}
-                  <br />
-                  {draft.sender.address.postalCode} {draft.sender.address.city}
-                  {draft.sender.address.country && (
-                    <>
-                      <br />
-                      {draft.sender.address.country}
-                    </>
+            {pageIndex === 0 && (
+              <header className="invoice-fixed">
+                <div>
+                  {pageIndex === 0 && (
+                    <div className="invoice-logo-space">
+                      {settingsLogo(draft.sender.logoDataUrl) && (
+                        <img
+                          className="invoice-logo"
+                          src={settingsLogo(draft.sender.logoDataUrl)!}
+                          alt="Company logo"
+                        />
+                      )}
+                    </div>
                   )}
-                  {draft.sender.phone && (
-                    <>
-                      <br />
-                      {draft.sender.phone}
-                    </>
-                  )}
-                  {draft.sender.email && (
-                    <>
-                      <br />
-                      {draft.sender.email}
-                    </>
-                  )}
-                  {draft.sender.website && (
-                    <>
-                      <br />
-                      {draft.sender.website}
-                    </>
-                  )}
-                  {draft.sender.iban && (
-                    <>
-                      <br />
-                      <b>IBAN: {draft.sender.iban}</b>
-                    </>
-                  )}
-                  {draft.sender.bankName && (
-                    <>
-                      <br />
-                      <b>Bank: {draft.sender.bankName}</b>
-                    </>
-                  )}
-                </p>
-              </div>
-              <div className="invoice-recipient-block">
-                {pageIndex > 0 && <h2>RECHNUNG · FORTSETZUNG</h2>}
-                <div className="preview-customer">
-                  <strong>{draft.customer?.name ?? 'Customer'}</strong>
-                  <p>
-                    {draft.customer?.address.street}{' '}
-                    {draft.customer?.address.buildingNumber}
+                  <strong className="invoice-sender-name">
+                    {draft.sender.name || 'Your company'}
+                  </strong>
+                  <p className="invoice-sender-details">
+                    {draft.sender.address.street}{' '}
+                    {draft.sender.address.buildingNumber}
                     <br />
-                    {draft.customer?.address.postalCode}{' '}
-                    {draft.customer?.address.city}
-                    {draft.customer?.email && (
+                    {draft.sender.address.postalCode}{' '}
+                    {draft.sender.address.city}
+                    {draft.sender.address.country && (
                       <>
                         <br />
-                        {draft.customer.email}
+                        {draft.sender.address.country}
                       </>
                     )}
-                    {draft.customer?.phone && (
+                    {draft.sender.phone && (
                       <>
                         <br />
-                        {draft.customer.phone}
+                        {draft.sender.phone}
+                      </>
+                    )}
+                    {draft.sender.email && (
+                      <>
+                        <br />
+                        {draft.sender.email}
+                      </>
+                    )}
+                    {draft.sender.website && (
+                      <>
+                        <br />
+                        {draft.sender.website}
+                      </>
+                    )}
+                    {draft.sender.iban && (
+                      <>
+                        <br />
+                        <b>IBAN: {draft.sender.iban}</b>
+                      </>
+                    )}
+                    {draft.sender.bankName && (
+                      <>
+                        <br />
+                        <b>Bank: {draft.sender.bankName}</b>
                       </>
                     )}
                   </p>
                 </div>
-              </div>
-            </header>
+                <div className="invoice-recipient-block">
+                  <div className="preview-customer">
+                    <strong>{draft.customer?.name ?? 'Customer'}</strong>
+                    <p>
+                      {draft.customer?.address.street}{' '}
+                      {draft.customer?.address.buildingNumber}
+                      <br />
+                      {draft.customer?.address.postalCode}{' '}
+                      {draft.customer?.address.city}
+                      {draft.customer?.email && (
+                        <>
+                          <br />
+                          {draft.customer.email}
+                        </>
+                      )}
+                      {draft.customer?.phone && (
+                        <>
+                          <br />
+                          {draft.customer.phone}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </header>
+            )}
             {pageIndex === 0 && (
               <section className="invoice-fixed invoice-heading-block">
                 <h2>RECHNUNG</h2>

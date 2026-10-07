@@ -341,7 +341,7 @@ td {
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow: auto;
   padding: 7.2% 7.2% 7.2%;
   background: #fff;
   color: #17202b;
@@ -359,6 +359,10 @@ td {
   align-items: flex-start;
   gap: 10%;
   min-height: 34%;
+  flex-shrink: 0;
+}
+.invoice-paper > .invoice-fixed {
+  flex-shrink: 0;
 }
 .invoice-paper header > div:first-child {
   width: 45%;
@@ -368,12 +372,8 @@ td {
 }
 .invoice-recipient-block {
   max-width: none;
-  padding-top: 38%;
+  padding-top: 31mm;
   text-align: left;
-}
-.invoice-recipient-block h2 {
-  margin: 0;
-  color: #236b48;
 }
 .invoice-recipient-block .preview-customer {
   margin-top: 0;
@@ -440,11 +440,12 @@ td {
   break-inside: avoid;
 }
 .invoice-footer {
+  flex: 0 0 auto;
   margin-top: auto;
   padding-top: 0.8rem;
   border-top: 1px solid #aab2ba;
   white-space: pre-line;
-  font-size: 0.82em;
+  font-size: 1em;
 }
 .invoice-pages {
   display: grid;
@@ -452,19 +453,6 @@ td {
   align-items: start;
   gap: 1rem;
   min-width: 0;
-}
-.invoice-paper header h2 {
-  margin: 0;
-  color: #245fce;
-}
-.invoice-continuation-header p {
-  display: none;
-}
-.invoice-continuation-header {
-  min-height: 8%;
-  align-items: center;
-  border-bottom: 1px solid #dce1e6;
-  margin-bottom: 1rem;
 }
 .invoice-notes {
   white-space: pre-line;
@@ -538,12 +526,17 @@ td {
   margin: 5.5em 0 0;
   white-space: pre-line;
 }
-.invoice-footer {
-  margin-top: 3.8em;
-  padding: 0;
-  border: 0;
-  white-space: pre-line;
-  font-size: 1em;
+.invoice-layout-warning {
+  width: min(100%, 210mm);
+  margin: 0 auto 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #b42318;
+  border-radius: 0.35rem;
+  background: #fff4f2;
+  color: #7a271a;
+}
+.invoice-layout-warning p {
+  margin: 0.2rem 0;
 }
 @media print {
   @page {
@@ -563,7 +556,7 @@ td {
     min-height: 0;
     box-sizing: border-box;
     margin: 0;
-    overflow: visible;
+    overflow: auto;
   }
   .invoice-paper:last-child {
     break-after: auto;
