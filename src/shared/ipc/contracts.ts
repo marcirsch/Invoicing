@@ -15,6 +15,7 @@ export interface IpcApi {
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   selectCsv(): Promise<Result<string | null>>;
   selectArchiveFolder(): Promise<Result<string | null>>;
+  selectInvoiceLogo(): Promise<Result<string | null>>;
   loadCustomers(delimiter?: CsvDelimiter): Promise<Result<Customer[]>>;
   listCustomers(): Promise<Result<Customer[]>>;
   saveCustomer(customer: Customer): Promise<Result<Customer[]>>;

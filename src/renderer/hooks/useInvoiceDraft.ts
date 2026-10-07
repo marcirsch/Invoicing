@@ -6,6 +6,7 @@ import type {
 } from '../../shared/domain/invoice';
 import type { Settings } from '../../shared/domain/settings';
 import { addCalendarDays } from '../../shared/invoice/dates';
+import { isIsoDate } from '../../shared/invoice/dates';
 
 function createDraft(settings: Settings, customers: Customer[]): InvoiceDraft {
   const today = new Date();
@@ -23,6 +24,8 @@ function createDraft(settings: Settings, customers: Customer[]): InvoiceDraft {
     lines: [],
     template: 'classic',
     notes: '',
+    invoiceFooter: settings.invoiceFooter,
+    dueDateMode: 'automatic',
   };
 }
 export function useInvoiceDraft(
@@ -56,16 +59,77 @@ export function useInvoiceDraft(
     return () => window.clearTimeout(timeout);
   }, [draft, loading, error]);
   function update(change: Partial<InvoiceDraft>) {
-    setDraft((current) => (current ? { ...current, ...change } : current));
+    setDraft((current) => {
+      if (!current) return current;
+      const next = { ...current, ...change };
+      if (
+        change.invoiceDate !== undefined &&
+        change.invoiceDate !== current.invoiceDate &&
+        current.dueDateMode === 'automatic' &&
+        isIsoDate(change.invoiceDate)
+      )
+        next.dueDate = addCalendarDays(
+          change.invoiceDate,
+          settings.paymentTermDays,
+        );
+      if (change.dueDate !== undefined && change.dueDate !== current.dueDate)
+        next.dueDateMode = 'manual';
+      return next;
+    });
+  }
+  useEffect(() => {
+    if (!draft) return;
+    if (
+      JSON.stringify(draft.sender) === JSON.stringify(settings.company) &&
+      draft.invoiceFooter === settings.invoiceFooter
+    )
+      return;
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            sender: settings.company,
+            invoiceFooter: settings.invoiceFooter,
+          }
+        : current,
+    );
+  }, [draft, settings.company, settings.invoiceFooter]);
+  useEffect(() => {
+    if (
+      !draft ||
+      draft.dueDateMode !== 'automatic' ||
+      !isIsoDate(draft.invoiceDate)
+    )
+      return;
+    const dueDate = addCalendarDays(
+      draft.invoiceDate,
+      settings.paymentTermDays,
+    );
+    if (draft.dueDate !== dueDate)
+      setDraft((current) => (current ? { ...current, dueDate } : current));
+  }, [
+    draft?.invoiceDate,
+    draft?.dueDateMode,
+    draft?.dueDate,
+    settings.paymentTermDays,
+  ]);
+  function resetDueDate() {
+    if (!draft || !isIsoDate(draft.invoiceDate)) return;
+    setDraft({
+      ...draft,
+      dueDateMode: 'automatic',
+      dueDate: addCalendarDays(draft.invoiceDate, settings.paymentTermDays),
+    });
   }
   function addLine() {
+    const previous = draft?.lines.at(-1);
     const line: InvoiceLineItem = {
       id: crypto.randomUUID(),
-      description: '',
-      hours: '',
-      rate: '',
+      description: previous?.description ?? '',
+      hours: previous?.hours ?? '',
+      rate: previous?.rate ?? '',
     };
     update({ lines: [...(draft?.lines ?? []), line] });
   }
-  return { draft, update, addLine, loading, error, setError };
+  return { draft, update, addLine, resetDueDate, loading, error, setError };
 }

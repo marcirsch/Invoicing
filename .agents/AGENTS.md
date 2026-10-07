@@ -6,7 +6,7 @@ Repository guidance for Codex and other coding agents working on the invoicing a
 
 This repository is planning a local desktop invoicing app for a small Swiss service business. The app will edit invoices, manage customers through a human-readable CSV, preview multi-page output, and generate an archived PDF with a Swiss QR-bill as its last page.
 
-**Current state:** Phase 1 foundation and settings plus an initial Phase 2 invoice draft editor, decimal-safe totals, date-only due dates, local draft persistence, and a screen preview are implemented. Invoice issuance, PDF archival, and Swiss QR-bill generation remain Phase 3.
+**Current state:** Phase 1 foundation and the Phase 2 invoice preparation flow are implemented, including company logo/footer settings, active-draft sender synchronization, automatic/manual due dates, and measured A4 preview pagination. Invoice issuance, Chromium PDF archival, and Swiss QR-bill generation remain Phase 3.
 
 The product requirements and decisions are documented in [.codex/PRD.md](../.codex/PRD.md). The sample layout is [example_invoice.pdf](../example_invoice.pdf).
 

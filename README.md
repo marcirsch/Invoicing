@@ -6,7 +6,7 @@ The planned app will run on macOS and Windows. It will let users manage customer
 
 ## Current status
 
-Phase 1 foundation and settings plus initial Phase 2 draft editing are implemented: invoice drafts use decimal-safe line calculations, date-only dates, local autosave/restore, customer selection, and a fixed-light on-screen preview. Invoice issuance, PDF archival, and Swiss QR-bill generation remain Phase 3.
+Phase 1 foundation and the Phase 2 invoice preparation flow are implemented: company settings include an optional local logo and recurring invoice footer; drafts synchronize saved sender details, support automatic or manual due dates, and show a content-measured multi-page A4 preview. Invoice issuance, PDF archival, and Swiss QR-bill generation remain Phase 3.
 
 ## Planned technology
 
@@ -29,7 +29,7 @@ Phase 1 establishes the desktop foundation and local data workflow:
 
 ## Phase 2 draft workspace
 
-The app provides one editable invoice draft with customer and company snapshots, date and currency controls, stable-ID service rows, a suggested number that does not advance settings, debounced local persistence, and a screen preview. Draft dates use `YYYY-MM-DD`; due dates use calendar-day arithmetic. The `classic` and `simple` choices currently share an early preview layout. Full page pagination and preview-to-editor keyboard navigation are not implemented yet. The preview is not a PDF and contains no QR-bill.
+The app provides one editable invoice draft with customer and company snapshots, date and currency controls, stable-ID service rows, a suggested number that does not advance settings, debounced local persistence, and a content-measured A4 preview. Draft dates use `YYYY-MM-DD`; automatic due dates use calendar-day arithmetic and manual overrides persist until reset. Both invoice templates share the preview markup. The preview is not a PDF and contains no QR-bill.
 
 Phase 3 will add validated issuance, immutable snapshots, PDF archival, and a compliant Swiss QR-bill. Draft data is stored separately in `invoice-draft.json`; malformed saved data is retained and reported instead of silently replaced.
 

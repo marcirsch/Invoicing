@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { defaultSettings } from '../../src/shared/domain/settingsDefaults';
-import { settingsSchema } from '../../src/shared/validation/settingsValidation';
+import {
+  settingsBaseSchema,
+  settingsSchema,
+} from '../../src/shared/validation/settingsValidation';
 
 const complete = {
   ...defaultSettings,
@@ -19,7 +22,14 @@ const complete = {
 };
 describe('settings validation', () => {
   it('accepts valid Swiss company and invoice settings', () => {
-    expect(settingsSchema.parse(complete)).toEqual(complete);
+    const result = settingsSchema.parse(complete);
+    expect(result.company).toMatchObject({
+      website: '',
+      iban: '',
+      bankName: '',
+      logoDataUrl: null,
+    });
+    expect(result.invoiceFooter).toBe('');
   });
   it('accepts blank optional email and both supported currencies', () => {
     expect(
@@ -58,6 +68,41 @@ describe('settings validation', () => {
     ).toBe(false);
     expect(
       settingsSchema.safeParse({ ...complete, currency: 'USD' }).success,
+    ).toBe(false);
+  });
+  it('adds defaults to legacy settings without discarding existing values', () => {
+    const legacy = structuredClone(complete) as Record<string, unknown>;
+    delete (legacy.company as Record<string, unknown>).website;
+    delete (legacy.company as Record<string, unknown>).iban;
+    delete (legacy.company as Record<string, unknown>).bankName;
+    delete (legacy.company as Record<string, unknown>).logoDataUrl;
+    delete legacy.invoiceFooter;
+    const parsed = settingsBaseSchema.parse(legacy);
+    expect(parsed.csvPath).toBe(complete.csvPath);
+    expect(parsed.company.website).toBe('');
+    expect(parsed.company.logoDataUrl).toBeNull();
+    expect(parsed.invoiceFooter).toBe('');
+  });
+  it('rejects unsupported and malformed logo data', () => {
+    for (const logoDataUrl of [
+      'data:image/svg+xml;base64,PHN2Zz4=',
+      'data:image/png;base64,not base64',
+    ]) {
+      expect(
+        settingsBaseSchema.safeParse({
+          ...complete,
+          company: { ...complete.company, logoDataUrl },
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      settingsBaseSchema.safeParse({
+        ...complete,
+        company: {
+          ...complete.company,
+          logoDataUrl: `data:image/png;base64,${'a'.repeat(2_000_001)}`,
+        },
+      }).success,
     ).toBe(false);
   });
 });

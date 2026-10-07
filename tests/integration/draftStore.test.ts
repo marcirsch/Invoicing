@@ -33,10 +33,16 @@ describe('DraftStore', () => {
         },
         phone: '',
         email: '',
+        website: '',
+        iban: '',
+        bankName: '',
+        logoDataUrl: null,
       },
       lines: [],
       template: 'classic',
       notes: '',
+      invoiceFooter: '',
+      dueDateMode: 'automatic',
     };
     await store.save(draft);
     expect(await store.load()).toEqual(draft);

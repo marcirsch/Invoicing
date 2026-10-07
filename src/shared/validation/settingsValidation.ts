@@ -1,4 +1,11 @@
 import { z } from 'zod';
+const logoDataUrlSchema = z
+  .string()
+  .max(2_000_022)
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/)
+  .nullable()
+  .optional()
+  .default(null);
 export const settingsBaseSchema = z.object({
   company: z.object({
     name: z.string(),
@@ -11,6 +18,10 @@ export const settingsBaseSchema = z.object({
     }),
     phone: z.string(),
     email: z.string().email().or(z.literal('')),
+    website: z.string().default(''),
+    iban: z.string().default(''),
+    bankName: z.string().default(''),
+    logoDataUrl: logoDataUrlSchema,
   }),
   csvPath: z.string().nullable(),
   archivePath: z.string().nullable(),
@@ -21,6 +32,7 @@ export const settingsBaseSchema = z.object({
   nextSequence: z.number().int().nonnegative(),
   template: z.string(),
   appearance: z.enum(['system', 'light', 'dark']),
+  invoiceFooter: z.string().max(2000).default(''),
 });
 export const settingsSchema = settingsBaseSchema.superRefine(
   (settings, context) => {

@@ -19,6 +19,10 @@ const api: IpcApi = {
     ipcRenderer.invoke('settings:select-archive') as Promise<
       Result<string | null>
     >,
+  selectInvoiceLogo: () =>
+    ipcRenderer.invoke('settings:select-logo') as Promise<
+      Result<string | null>
+    >,
   loadCustomers: (delimiter) =>
     ipcRenderer.invoke('customers:select', delimiter) as Promise<
       Result<Customer[]>

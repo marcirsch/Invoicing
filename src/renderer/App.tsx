@@ -48,6 +48,15 @@ export default function App(): JSX.Element {
     if (!result.ok) settings.setError(result.error.message);
     else if (result.value) await settings.refresh();
   }
+  async function chooseLogo() {
+    const result = await window.invoicing.selectInvoiceLogo();
+    if (!result.ok) settings.setError(result.error.message);
+    else if (result.value)
+      settings.setSettings({
+        ...settings.settings,
+        company: { ...settings.settings.company, logoDataUrl: result.value },
+      });
+  }
   async function chooseDelimiter(delimiter: ',' | ';' | '\t') {
     if (await customerState.refresh(delimiter)) await settings.refresh();
   }
@@ -112,6 +121,7 @@ export default function App(): JSX.Element {
           customers={customerState.customers}
           onChange={invoice.update}
           onAddLine={invoice.addLine}
+          onResetDueDate={invoice.resetDueDate}
           error={invoice.error}
         />
       ) : page === 'settings' ? (
@@ -124,6 +134,7 @@ export default function App(): JSX.Element {
           onSave={saveSettings}
           onSelectCsv={() => void chooseCsv()}
           onSelectArchive={() => void chooseArchive()}
+          onSelectLogo={() => void chooseLogo()}
         />
       ) : editing !== undefined ? (
         <CustomerForm

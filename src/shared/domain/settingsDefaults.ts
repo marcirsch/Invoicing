@@ -11,6 +11,10 @@ export const defaultSettings: Settings = {
     },
     phone: '',
     email: '',
+    website: '',
+    iban: '',
+    bankName: '',
+    logoDataUrl: null,
   },
   csvPath: null,
   archivePath: null,
@@ -21,4 +25,5 @@ export const defaultSettings: Settings = {
   nextSequence: 1,
   template: 'default',
   appearance: 'system',
+  invoiceFooter: '',
 };

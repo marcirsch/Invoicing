@@ -22,6 +22,8 @@ export interface InvoiceDraft {
   lines: InvoiceLineItem[];
   template: InvoiceTemplate;
   notes: string;
+  invoiceFooter: string;
+  dueDateMode: 'automatic' | 'manual';
 }
 export type InvoiceField =
   'description' | 'hours' | 'rate' | 'invoiceDate' | 'dueDate' | 'customer';

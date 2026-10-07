@@ -2,7 +2,11 @@ import { BrowserWindow, nativeTheme } from 'electron';
 import type { CsvDelimiter } from '../../shared/csv/dialect';
 import type { Settings } from '../../shared/domain/settings';
 import { settingsSchema } from '../../shared/validation/settingsValidation';
-import { selectArchiveFolder, selectCsv } from '../services/fileDialogService';
+import {
+  selectArchiveFolder,
+  selectCsv,
+  selectInvoiceLogo,
+} from '../services/fileDialogService';
 import type { SettingsStore } from '../services/settingsStore';
 import type { HandlerRegistrar } from './registerHandlers';
 
@@ -37,5 +41,17 @@ export function registerSettingsHandlers(
     const settings = await store.load();
     await store.savePreferences({ ...settings, archivePath: folderPath });
     return folderPath;
+  });
+  register('settings:select-logo', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) throw new Error('The application window is unavailable.');
+    const logoDataUrl = await selectInvoiceLogo(window);
+    if (!logoDataUrl) return null;
+    const settings = await store.load();
+    await store.savePreferences({
+      ...settings,
+      company: { ...settings.company, logoDataUrl },
+    });
+    return logoDataUrl;
   });
 }

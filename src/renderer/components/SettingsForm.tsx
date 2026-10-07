@@ -11,6 +11,7 @@ interface Props {
   onSave(): Promise<boolean>;
   onSelectCsv(): void;
   onSelectArchive(): void;
+  onSelectLogo(): void;
 }
 export function SettingsForm({
   settings,
@@ -21,6 +22,7 @@ export function SettingsForm({
   onSave,
   onSelectCsv,
   onSelectArchive,
+  onSelectLogo,
 }: Props): JSX.Element {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const field = (
@@ -153,6 +155,22 @@ export function SettingsForm({
             (value) => company('email', value),
             'email',
           )}
+          {field(
+            'Website',
+            'company-website',
+            settings.company.website,
+            (value) => company('website', value),
+            'url',
+          )}
+          {field('IBAN', 'company-iban', settings.company.iban, (value) =>
+            company('iban', value),
+          )}
+          {field(
+            'Bank name',
+            'company-bank-name',
+            settings.company.bankName,
+            (value) => company('bankName', value),
+          )}
         </div>
       </fieldset>
       <fieldset disabled={loading || saving}>
@@ -221,6 +239,33 @@ export function SettingsForm({
               <option value="dark">Dark</option>
             </select>
           </label>
+        </div>
+        <label className="field settings-footer" htmlFor="invoice-footer">
+          Invoice footer text
+          <textarea
+            id="invoice-footer"
+            value={settings.invoiceFooter}
+            onChange={(event) =>
+              onChange({ ...settings, invoiceFooter: event.target.value })
+            }
+          />
+        </label>
+      </fieldset>
+      <fieldset disabled={loading || saving}>
+        <legend>Invoice logo</legend>
+        <div className="path-setting">
+          {settings.company.logoDataUrl ? (
+            <img
+              className="settings-logo"
+              src={settings.company.logoDataUrl}
+              alt="Selected invoice logo"
+            />
+          ) : (
+            <span>No logo selected</span>
+          )}
+          <button type="button" className="secondary" onClick={onSelectLogo}>
+            Choose logo…
+          </button>
         </div>
       </fieldset>
       <fieldset disabled={loading || saving}>

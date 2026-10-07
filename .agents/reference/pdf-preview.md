@@ -17,6 +17,7 @@ Use this guide for invoice HTML/CSS, live preview, Chromium printing, Swiss QR-b
 - Keep table headings understandable across pages. Avoid separating totals from their context where practical.
 - Check totals, closing text, and footers for clipping or stranded content. Append the QR-bill after all invoice pages.
 - Wait for document fonts and local logo/image decoding before printing. Avoid remote assets so export works offline.
+- The current app has no PDF export service. When `printToPDF` is added, use `pageSize: 'A4'`, zero-valued `margins` on all four sides, `printBackground: true`, and `preferCSSPageSize: true` to match the current `@page { size: A4; margin: 0 }` shell and its internal paper padding. Wait for `document.fonts.ready` and local image decoding before calling Electron.
 - Check German characters, line wrapping, amount alignment, and logo scaling in both preview and output.
 
 ## Swiss QR-bill and assembly

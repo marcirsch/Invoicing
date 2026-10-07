@@ -21,11 +21,57 @@ describe('invoice draft validation', () => {
         },
         phone: '',
         email: '',
+        website: '',
+        iban: '',
+        bankName: '',
+        logoDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
       },
       lines: [],
       template: 'classic',
       notes: '',
     });
     expect(result.success).toBe(false);
+  });
+  it('defaults new fields when reading a legacy draft and validates sender logo placement', () => {
+    const result = invoiceDraftSchema.parse({
+      id: '00000000-0000-4000-8000-000000000000',
+      invoiceDate: '2025-02-28',
+      dueDate: '2025-03-30',
+      currency: 'CHF',
+      suggestedNumber: '',
+      customerId: null,
+      customer: null,
+      sender: {
+        name: '',
+        address: {
+          street: '',
+          buildingNumber: '',
+          postalCode: '',
+          city: '',
+          country: '',
+        },
+        phone: '',
+        email: '',
+      },
+      lines: [],
+      template: 'classic',
+      notes: '',
+    });
+    expect(result.dueDateMode).toBe('automatic');
+    expect(result.invoiceFooter).toBe('');
+    expect(result.sender.logoDataUrl).toBeNull();
+    expect(
+      invoiceDraftSchema.safeParse({ ...result, dueDateMode: 'sometimes' })
+        .success,
+    ).toBe(false);
+    expect(
+      invoiceDraftSchema.safeParse({
+        ...result,
+        sender: {
+          ...result.sender,
+          logoDataUrl: 'data:image/svg+xml;base64,xx',
+        },
+      }).success,
+    ).toBe(false);
   });
 });

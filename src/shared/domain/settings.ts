@@ -10,4 +10,5 @@ export interface Settings {
   nextSequence: number;
   template: string;
   appearance: 'system' | 'light' | 'dark';
+  invoiceFooter: string;
 }

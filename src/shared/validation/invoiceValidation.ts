@@ -20,6 +20,16 @@ const companySchema = z.object({
   address: addressSchema,
   phone: z.string(),
   email: z.string(),
+  website: z.string().default(''),
+  iban: z.string().default(''),
+  bankName: z.string().default(''),
+  logoDataUrl: z
+    .string()
+    .max(2_000_022)
+    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/)
+    .nullable()
+    .optional()
+    .default(null),
 });
 export const invoiceDraftSchema = z.object({
   id: z.string().uuid(),
@@ -42,6 +52,8 @@ export const invoiceDraftSchema = z.object({
     .max(500),
   template: z.enum(['classic', 'simple']).default('classic'),
   notes: z.string().max(4000),
+  invoiceFooter: z.string().max(2000).default(''),
+  dueDateMode: z.enum(['automatic', 'manual']).default('automatic'),
 });
 export const persistedDraftSchema = z.object({
   version: z.literal(1),

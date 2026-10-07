@@ -36,6 +36,14 @@ function safeFailure(error: unknown, fallback: string) {
     return { ok: false, error: { code: 'conflict', message: error.message } };
   if (
     error instanceof Error &&
+    /^(The selected logo|Choose a valid PNG)/.test(error.message)
+  )
+    return {
+      ok: false,
+      error: { code: 'invalid_logo', message: error.message },
+    };
+  if (
+    error instanceof Error &&
     /^(Select a customer|Choose a customer|The customer CSV|CSV is missing|required columns|CSV contains duplicate|CSV customer records|This file is not valid|CSV content|CSV rows)/.test(
       error.message,
     )
