@@ -34,6 +34,8 @@ export function InvoiceWorkspace({
   const previewRef = useRef<HTMLDivElement>(null);
   const rowHeights = useRef(new Map<string, number>());
   const [pageLines, setPageLines] = useState([draft.lines]);
+  const [oversizedLineIds, setOversizedLineIds] = useState<string[]>([]);
+  const [footerTooTall, setFooterTooTall] = useState(false);
   const contentKey = useMemo(
     () =>
       JSON.stringify([
@@ -54,43 +56,59 @@ export function InvoiceWorkspace({
       if (!paper) return;
       const paperHeight = paper.getBoundingClientRect().height;
       const firstPage = root.querySelector<HTMLElement>('.invoice-paper');
-      const fixedHeight = Array.from(
-        firstPage?.querySelectorAll<HTMLElement>(
-          '.invoice-fixed:not(.preview-total):not(.invoice-notes)',
-        ) ?? [],
-      ).reduce((sum, item) => sum + item.getBoundingClientRect().height, 0);
+      if (!firstPage) return;
+      const continuationPage = root.querySelector<HTMLElement>(
+        '.invoice-paper:nth-child(2)',
+      );
+      const innerHeight = paperHeight * (1 - 0.072 * 2);
+      const regionHeight = (selector: string, page: HTMLElement | null) =>
+        page
+          ? Array.from(page.querySelectorAll<HTMLElement>(selector)).reduce(
+              (sum, item) => sum + item.getBoundingClientRect().height,
+              0,
+            )
+          : 0;
+      const firstFixed = regionHeight(
+        '.invoice-fixed:not(.preview-total):not(.invoice-notes)',
+        firstPage,
+      );
+      const continuationFixed = continuationPage
+        ? regionHeight(
+            '.invoice-continuation-header, .invoice-fixed.invoice-heading-block',
+            continuationPage,
+          )
+        : paperHeight * 0.08;
       const tableHeadingHeight =
-        firstPage?.querySelector('thead')?.getBoundingClientRect().height ?? 0;
+        firstPage.querySelector('thead')?.getBoundingClientRect().height ?? 0;
       const closingPage = root.querySelector<HTMLElement>(
         '.invoice-paper:last-child',
       );
-      const closingHeight = closingPage
-        ? Array.from(
-            closingPage.querySelectorAll<HTMLElement>(
-              '.preview-total, .invoice-notes',
-            ),
-          ).reduce((sum, item) => sum + item.getBoundingClientRect().height, 0)
-        : 0;
-      const footerHeight =
-        firstPage
-          ?.querySelector<HTMLElement>('.invoice-footer')
-          ?.getBoundingClientRect().height ?? 0;
-      const available = Math.max(
-        120,
-        paperHeight -
-          fixedHeight -
-          tableHeadingHeight -
-          closingHeight -
-          footerHeight -
-          paperHeight * 0.14,
+      const closingHeight = regionHeight(
+        '.preview-total, .invoice-notes',
+        closingPage,
       );
-      const pages = assignMeasuredPages(
+      const footerHeight = regionHeight('.invoice-footer', firstPage);
+      const footerRegion = innerHeight * 0.22;
+      setFooterTooTall(footerHeight > footerRegion);
+      const commonReserved = tableHeadingHeight + footerHeight;
+      const capacities = {
+        first: innerHeight - firstFixed - commonReserved,
+        firstFinal:
+          innerHeight - firstFixed - commonReserved - closingHeight,
+        continuation: innerHeight - continuationFixed - commonReserved,
+        final: innerHeight - continuationFixed - commonReserved - closingHeight,
+      };
+      const assignment = assignMeasuredPages(
         draft.lines.map((line) => ({
           ...line,
           height: rowHeights.current.get(line.id) ?? 32,
         })),
-        available,
-      ).map((rows) => rows.map(({ height: _height, ...line }) => line));
+        capacities,
+      );
+      setOversizedLineIds(assignment.oversizedItemIds);
+      const pages = assignment.pages.map((rows) =>
+        rows.map(({ height: _height, ...line }) => line),
+      );
       setPageLines((current) =>
         JSON.stringify(current.map((rows) => rows.map((row) => row.id))) ===
         JSON.stringify(pages.map((rows) => rows.map((row) => row.id)))
@@ -319,6 +337,19 @@ export function InvoiceWorkspace({
         aria-label="Invoice preview"
         ref={previewRef}
       >
+        {(footerTooTall || oversizedLineIds.length > 0) && (
+          <div className="invoice-layout-warning" role="alert">
+            {footerTooTall && (
+              <p>The invoice footer is too tall to fit in the page footer area.</p>
+            )}
+            {oversizedLineIds.length > 0 && (
+              <p>
+                One or more service rows are taller than the available page area
+                and may not fit without splitting.
+              </p>
+            )}
+          </div>
+        )}
         {pageLines.map((lines, pageIndex) => (
           <section
             key={pageIndex}
@@ -329,15 +360,21 @@ export function InvoiceWorkspace({
               className={`invoice-fixed ${pageIndex > 0 ? 'invoice-continuation-header' : ''}`}
             >
               <div>
-                {pageIndex === 0 && settingsLogo(draft.sender.logoDataUrl) && (
-                  <img
-                    className="invoice-logo"
-                    src={settingsLogo(draft.sender.logoDataUrl)!}
-                    alt="Company logo"
-                  />
+                {pageIndex === 0 && (
+                  <div className="invoice-logo-space">
+                    {settingsLogo(draft.sender.logoDataUrl) && (
+                      <img
+                        className="invoice-logo"
+                        src={settingsLogo(draft.sender.logoDataUrl)!}
+                        alt="Company logo"
+                      />
+                    )}
+                  </div>
                 )}
-                <strong>{draft.sender.name || 'Your company'}</strong>
-                <p>
+                <strong className="invoice-sender-name">
+                  {draft.sender.name || 'Your company'}
+                </strong>
+                <p className="invoice-sender-details">
                   {draft.sender.address.street}{' '}
                   {draft.sender.address.buildingNumber}
                   <br />
@@ -369,19 +406,19 @@ export function InvoiceWorkspace({
                   {draft.sender.iban && (
                     <>
                       <br />
-                      IBAN: {draft.sender.iban}
+                      <b>IBAN: {draft.sender.iban}</b>
                     </>
                   )}
                   {draft.sender.bankName && (
                     <>
                       <br />
-                      {draft.sender.bankName}
+                      <b>Bank: {draft.sender.bankName}</b>
                     </>
                   )}
                 </p>
               </div>
               <div className="invoice-recipient-block">
-                <h2>{pageIndex === 0 ? 'INVOICE' : 'INVOICE · CONTINUED'}</h2>
+                {pageIndex > 0 && <h2>RECHNUNG · FORTSETZUNG</h2>}
                 <div className="preview-customer">
                   <strong>{draft.customer?.name ?? 'Customer'}</strong>
                   <p>
@@ -390,23 +427,44 @@ export function InvoiceWorkspace({
                     <br />
                     {draft.customer?.address.postalCode}{' '}
                     {draft.customer?.address.city}
+                    {draft.customer?.email && (
+                      <>
+                        <br />
+                        {draft.customer.email}
+                      </>
+                    )}
+                    {draft.customer?.phone && (
+                      <>
+                        <br />
+                        {draft.customer.phone}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
             </header>
-            <p className="invoice-fixed invoice-identity">
-              <b>{draft.suggestedNumber}</b>
-              <span>
-                Invoice date: {draft.invoiceDate} · Due: {draft.dueDate}
-              </span>
-            </p>
+            {pageIndex === 0 && (
+              <section className="invoice-fixed invoice-heading-block">
+                <h2>RECHNUNG</h2>
+                <div className="invoice-meta-grid">
+                  <strong>Rechnungsdatum</strong>
+                  <strong>{formatInvoiceDate(draft.invoiceDate)}</strong>
+                  <strong>Zahlbar bis</strong>
+                  <strong>{formatInvoiceDate(draft.dueDate)}</strong>
+                  <strong>Rechnungsnummer</strong>
+                  <strong>{draft.suggestedNumber}</strong>
+                </div>
+              </section>
+            )}
             <table>
               <thead>
                 <tr>
-                  <th>Description</th>
-                  <th>Hours</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
+                  <th>POS.</th>
+                  <th>BESCHREIBUNG</th>
+                  <th>DATUM</th>
+                  <th>STUNDEN</th>
+                  <th>{draft.currency}/STD</th>
+                  <th>PREIS IN {draft.currency}</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,12 +482,20 @@ export function InvoiceWorkspace({
                           );
                       }}
                     >
+                      <td className="invoice-position-cell">
+                        {draft.lines.findIndex((item) => item.id === line.id) +
+                          1}
+                        .
+                      </td>
                       <td>{line.description || 'Service'}</td>
-                      <td>{line.hours}</td>
-                      <td>{line.rate}</td>
-                      <td>
+                      <td>{formatInvoiceDate(draft.invoiceDate)}</td>
+                      <td className="invoice-number-cell">{line.hours}</td>
+                      <td className="invoice-number-cell">
+                        {line.rate} {draft.currency}
+                      </td>
+                      <td className="invoice-number-cell">
                         {value.valid
-                          ? formatCurrency(value.amount, draft.currency)
+                          ? `${formatInvoiceAmount(value.amount?.toNumber() ?? 0)} ${draft.currency}`
                           : '—'}
                       </td>
                     </tr>
@@ -440,10 +506,10 @@ export function InvoiceWorkspace({
             {pageIndex === pageLines.length - 1 && (
               <>
                 <div className="preview-total invoice-fixed">
-                  <strong>Total</strong>
+                  <strong>Gesamt total</strong>
                   <strong>
                     {total.valid
-                      ? formatCurrency(total.amount, draft.currency)
+                      ? `${formatInvoiceAmount(total.amount?.toNumber() ?? 0)} ${draft.currency}`
                       : '—'}
                   </strong>
                 </div>
@@ -464,4 +530,15 @@ export function InvoiceWorkspace({
 
 function settingsLogo(dataUrl: string | null | undefined): string | null {
   return dataUrl ?? null;
+}
+
+function formatInvoiceDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
+
+function formatInvoiceAmount(value: number): string {
+  return new Intl.NumberFormat('de-CH', { maximumFractionDigits: 2 }).format(
+    value,
+  );
 }

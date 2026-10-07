@@ -3,29 +3,59 @@ export interface MeasuredItem {
   height: number;
 }
 
-/** Assigns intact rows to pages; an individually oversized row gets its own page. */
+export interface PageCapacities {
+  first: number;
+  firstFinal?: number;
+  continuation: number;
+  final: number;
+}
+
+export interface MeasuredPages<T> {
+  pages: T[][];
+  oversizedItemIds: string[];
+}
+
+/** Assigns intact rows using separate first, continuation, and closing capacities. */
 export function assignMeasuredPages<T extends MeasuredItem>(
   items: T[],
-  availableHeight: number,
-): T[][] {
-  const capacity = Math.max(1, availableHeight);
+  capacities: PageCapacities,
+): MeasuredPages<T> {
+  if (items.length === 0) return { pages: [[]], oversizedItemIds: [] };
+
+  const oversizedItemIds = items
+    .filter(
+      (item) =>
+        item.height >
+        Math.max(0, capacities.first, capacities.continuation, capacities.final),
+    )
+    .map((item) => item.id);
   const pages: T[][] = [];
-  let page: T[] = [];
-  let used = 0;
-  for (const item of items) {
-    if (page.length > 0 && used + item.height > capacity) {
-      pages.push(page);
-      page = [];
-      used = 0;
+  let remaining = [...items];
+
+  while (remaining.length > 0) {
+    const pageIndex = pages.length;
+    const remainingHeight = remaining.reduce((sum, item) => sum + item.height, 0);
+    const capacity =
+      pageIndex === 0 && remainingHeight <= (capacities.firstFinal ?? capacities.final)
+        ? (capacities.firstFinal ?? capacities.final)
+        : pageIndex === 0
+          ? capacities.first
+          : remainingHeight <= capacities.final
+            ? capacities.final
+            : capacities.continuation;
+    const page: T[] = [];
+    let used = 0;
+
+    while (remaining.length > 0) {
+      const next = remaining[0];
+      if (page.length > 0 && used + next.height > Math.max(0, capacity)) break;
+      page.push(next);
+      remaining = remaining.slice(1);
+      used += next.height;
+      if (next.height > Math.max(0, capacity)) break;
     }
-    page.push(item);
-    used += item.height;
-    if (item.height > capacity) {
-      pages.push(page);
-      page = [];
-      used = 0;
-    }
+    pages.push(page);
   }
-  if (page.length || pages.length === 0) pages.push(page);
-  return pages;
+
+  return { pages, oversizedItemIds };
 }
