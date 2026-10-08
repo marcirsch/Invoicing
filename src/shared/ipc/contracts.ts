@@ -2,6 +2,11 @@ import type { Customer } from '../domain/customer';
 import type { Settings } from '../domain/settings';
 import type { CsvDelimiter } from '../csv/dialect';
 import type { InvoiceDraft } from '../domain/invoice';
+import type {
+  InvoiceArchiveEntry,
+  IssuedInvoice,
+} from '../domain/issuedInvoice';
+import type { IssueInvoiceInput } from '../validation/issuedInvoiceValidation';
 export interface StructuredError {
   code: string;
   message: string;
@@ -21,4 +26,9 @@ export interface IpcApi {
   saveCustomer(customer: Customer): Promise<Result<Customer[]>>;
   deleteCustomer(id: string): Promise<Result<Customer[]>>;
   reloadCustomers(): Promise<Result<Customer[]>>;
+  issueInvoice(input: IssueInvoiceInput): Promise<Result<IssuedInvoice>>;
+  listInvoices(): Promise<Result<InvoiceArchiveEntry[]>>;
+  readInvoice(id: string): Promise<Result<IssuedInvoice>>;
+  openInvoicePdf(id: string): Promise<Result<boolean>>;
+  revealInvoicePdf(id: string): Promise<Result<boolean>>;
 }

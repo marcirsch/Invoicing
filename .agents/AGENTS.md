@@ -6,7 +6,7 @@ Repository guidance for Codex and other coding agents working on the invoicing a
 
 This repository is planning a local desktop invoicing app for a small Swiss service business. The app will edit invoices, manage customers through a human-readable CSV, preview multi-page output, and generate an archived PDF with a Swiss QR-bill as its last page.
 
-**Current state:** Phase 1 foundation and the Phase 2 invoice preparation flow are implemented, including company logo/footer settings, active-draft sender synchronization, automatic/manual due dates, and measured A4 preview pagination. Invoice issuance, Chromium PDF archival, and Swiss QR-bill generation remain Phase 3.
+**Current state:** Phase 1 and Phase 2 are implemented. Phase 3 issuance code now includes shared issue validation, Chromium print rendering from the invoice preview, SwissQRBill/PDFKit, pdf-lib assembly, journaled archive storage, issue/replacement actions, and archive UI. Automated project checks pass, but visual invoice review, QR validator/scanner checks, recovery/failure workflows, and Windows verification remain outstanding; do not mark Phase 3 or Phase 4 release criteria complete until they are performed.
 
 The product requirements and decisions are documented in [.codex/PRD.md](../.codex/PRD.md). The sample layout is [example_invoice.pdf](../example_invoice.pdf).
 
@@ -21,10 +21,10 @@ The product requirements and decisions are documented in [.codex/PRD.md](../.cod
 | `csv-parse` 7, `csv-stringify` 6 | Customer CSV parsing and serialization |
 | Vitest 4, ESLint 9, Prettier 3 | Tests, linting, and formatting |
 | HTML/CSS with Chromium | Future invoice preview and invoice PDF rendering |
-| `swissqrbill` with PDFKit | Future Swiss QR-bill payment page |
-| Node PDF merge library | Future QR-bill page assembly |
+| `swissqrbill` 4.4.1 with PDFKit 0.17.2 | QR-bill payment page (MIT, Node.js >=18; ESM PDF entry) |
+| `@cantoo/pdf-lib` 2.11.1 | QR-bill page assembly (actively maintained MIT fork, runtime-independent) |
 | User-selected CSV | Customer source of truth |
-| Local application data | Current company settings; future draft and invoice archive metadata |
+| Local application data | Company settings, active draft, and versioned issued-invoice archive metadata |
 
 Exact dependency ranges are recorded in `package.json` and resolved versions in `package-lock.json`.
 

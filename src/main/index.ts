@@ -5,6 +5,9 @@ import { registerHandlers } from './ipc/registerHandlers';
 import { SettingsStore } from './services/settingsStore';
 import { CustomerCsvService } from './services/customerCsvService';
 import { DraftStore } from './services/draftStore';
+import { InvoiceArchiveStore } from './services/invoiceArchiveStore';
+import { InvoiceIssuanceService } from './services/invoiceIssuanceService';
+import { renderInvoicePdf } from './services/invoicePdfService';
 function createWindow(): void {
   const rendererFile = pathToFileURL(
     path.join(__dirname, '../renderer/index.html'),
@@ -64,15 +67,27 @@ app.whenReady().then(() => {
       },
     }),
   );
-  const store = new SettingsStore(app.getPath('userData'));
+  const testUserDataPath = process.env.INVOICING_TEST_USER_DATA_PATH?.trim();
+  const userDataPath = testUserDataPath
+    ? path.resolve(testUserDataPath)
+    : app.getPath('userData');
+  if (testUserDataPath) app.setPath('userData', userDataPath);
+  const store = new SettingsStore(userDataPath);
   void store.load().then((settings) => {
     nativeTheme.themeSource = settings.appearance;
   });
-  registerHandlers(
+  const drafts = new DraftStore(userDataPath);
+  const archive = new InvoiceArchiveStore(userDataPath);
+  const rendererUrl =
+    process.env.ELECTRON_RENDERER_URL ??
+    pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
+  const issuance = new InvoiceIssuanceService(
     store,
-    new CustomerCsvService(),
-    new DraftStore(app.getPath('userData')),
+    drafts,
+    archive,
+    (invoice) => renderInvoicePdf(rendererUrl, invoice),
   );
+  registerHandlers(store, new CustomerCsvService(), drafts, archive, issuance);
   createWindow();
   app.on('activate', () => {
     if (!BrowserWindow.getAllWindows().length) createWindow();

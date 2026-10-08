@@ -131,5 +131,17 @@ export function useInvoiceDraft(
     };
     update({ lines: [...(draft?.lines ?? []), line] });
   }
-  return { draft, update, addLine, resetDueDate, loading, error, setError };
+  function rotateDraft(nextSettings = settings) {
+    setDraft(createDraft(nextSettings, customers));
+  }
+  return {
+    draft,
+    update,
+    addLine,
+    resetDueDate,
+    loading,
+    error,
+    setError,
+    rotateDraft,
+  };
 }

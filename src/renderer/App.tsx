@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Customer } from '../shared/domain/customer';
 import { AppShell } from './components/AppShell';
 import { CustomerForm } from './components/CustomerForm';
@@ -9,9 +9,66 @@ import { useCustomers } from './hooks/useCustomers';
 import { useSettings } from './hooks/useSettings';
 import { useInvoiceDraft } from './hooks/useInvoiceDraft';
 import { InvoiceWorkspace } from './components/InvoiceWorkspace';
+import type { IssuedInvoice } from '../shared/domain/issuedInvoice';
+import { issuedInvoiceSchema } from '../shared/validation/issuedInvoiceValidation';
+import { InvoiceArchive } from './components/InvoiceArchive';
 
-type Page = 'customers' | 'settings' | 'invoice';
+type Page = 'customers' | 'settings' | 'invoice' | 'archive';
 export default function App(): JSX.Element {
+  const isPrintRoute =
+    new URLSearchParams(window.location.search).get('printInvoice') === '1';
+  return isPrintRoute ? <InvoicePrint /> : <MainApp />;
+}
+
+function InvoicePrint(): JSX.Element {
+  const [printInvoice, setPrintInvoice] = useState<IssuedInvoice | null>(null);
+  useEffect(() => {
+    window.__setPrintInvoice = (serialized) => {
+      try {
+        const parsed = issuedInvoiceSchema.safeParse(
+          JSON.parse(serialized) as unknown,
+        );
+        if (parsed.success) setPrintInvoice(parsed.data);
+      } catch {
+        setPrintInvoice(null);
+      }
+    };
+    return () => {
+      delete window.__setPrintInvoice;
+    };
+  }, []);
+  if (!printInvoice) return <p>Preparing invoice for print…</p>;
+  return (
+    <InvoiceWorkspace
+      draft={{
+        id: printInvoice.id,
+        invoiceDate: printInvoice.invoiceDate,
+        dueDate: printInvoice.dueDate,
+        currency: printInvoice.currency,
+        suggestedNumber: printInvoice.invoiceNumber,
+        customerId: printInvoice.recipient.id,
+        customer: printInvoice.recipient,
+        sender: {
+          ...printInvoice.sender,
+          logoDataUrl: printInvoice.sender.logoDataUrl ?? null,
+        },
+        lines: printInvoice.lines,
+        template: printInvoice.template,
+        notes: printInvoice.notes,
+        invoiceFooter: printInvoice.invoiceFooter,
+        dueDateMode: 'manual',
+      }}
+      customers={[printInvoice.recipient]}
+      onChange={() => undefined}
+      onAddLine={() => undefined}
+      onResetDueDate={() => undefined}
+      error={null}
+      printOnly
+    />
+  );
+}
+
+function MainApp(): JSX.Element {
   const [page, setPage] = useState<Page>('customers');
   const [editing, setEditing] = useState<Customer | null | undefined>(
     undefined,
@@ -23,6 +80,12 @@ export default function App(): JSX.Element {
     customerState.customers,
     !settings.loading && !customerState.loading,
   );
+  const [issuing, setIssuing] = useState(false);
+  const [issueMessage, setIssueMessage] = useState<string | null>(null);
+  const [replacesInvoiceId, setReplacesInvoiceId] = useState<string | null>(
+    null,
+  );
+  const transactionId = useRef<string | null>(null);
   useEffect(() => {
     if (settings.loading) return;
     if (settings.settings.appearance === 'system')
@@ -76,6 +139,63 @@ export default function App(): JSX.Element {
     )
       await customerState.remove(customer.id);
   }
+  async function issueInvoice(numberOverride: string) {
+    if (!invoice.draft || issuing) return;
+    setIssuing(true);
+    setIssueMessage('Validating and creating the invoice…');
+    transactionId.current ??= crypto.randomUUID();
+    const result = await window.invoicing.issueInvoice({
+      draft: invoice.draft,
+      numberOverride: numberOverride || undefined,
+      transactionId: transactionId.current,
+      replacesInvoiceId,
+    });
+    setIssuing(false);
+    if (!result.ok) {
+      setIssueMessage(result.error.message);
+      return;
+    }
+    const updatedSettings = await window.invoicing.getSettings();
+    if (updatedSettings.ok) {
+      settings.setSettings(updatedSettings.value);
+      invoice.rotateDraft(updatedSettings.value);
+    } else {
+      await settings.refresh();
+      invoice.rotateDraft();
+    }
+    transactionId.current = null;
+    setReplacesInvoiceId(null);
+    setIssueMessage(`Invoice ${result.value.invoiceNumber} was issued.`);
+    const open = window.confirm(
+      'Invoice issued successfully. Open the archived PDF now?',
+    );
+    if (open) await window.invoicing.openInvoicePdf(result.value.id);
+  }
+  async function replaceInvoice(id: string) {
+    const result = await window.invoicing.readInvoice(id);
+    if (!result.ok) {
+      setIssueMessage(result.error.message);
+      return;
+    }
+    const record = result.value;
+    setReplacesInvoiceId(record.id);
+    invoice.update({
+      id: crypto.randomUUID(),
+      customer: record.recipient,
+      customerId: record.recipient.id,
+      sender: record.sender,
+      lines: structuredClone(record.lines),
+      currency: record.currency,
+      invoiceDate: new Date().toISOString().slice(0, 10),
+      dueDate: record.dueDate,
+      suggestedNumber: `${settings.settings.invoicePrefix}${settings.settings.invoiceYear}-${String(settings.settings.nextSequence).padStart(3, '0')}`,
+      template: record.template,
+      notes: record.notes,
+      invoiceFooter: record.invoiceFooter,
+    });
+    setPage('invoice');
+    setIssueMessage(`New draft prepared to replace ${record.invoiceNumber}.`);
+  }
 
   return (
     <AppShell active={page} onNavigate={setPage}>
@@ -123,7 +243,12 @@ export default function App(): JSX.Element {
           onAddLine={invoice.addLine}
           onResetDueDate={invoice.resetDueDate}
           error={invoice.error}
+          onIssue={(number) => void issueInvoice(number)}
+          issuing={issuing}
+          issueMessage={issueMessage}
         />
+      ) : page === 'archive' ? (
+        <InvoiceArchive onReplace={(id) => void replaceInvoice(id)} />
       ) : page === 'settings' ? (
         <SettingsForm
           settings={settings.settings}

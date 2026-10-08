@@ -8,34 +8,52 @@ import {
   formatCurrency,
 } from '../../shared/invoice/money';
 
-export function InvoiceWorkspace({
-  draft,
-  customers,
-  onChange,
-  onAddLine,
-  onResetDueDate,
-  error,
-}: {
+interface InvoiceWorkspaceProps {
   draft: InvoiceDraft | null;
   customers: Customer[];
   onChange(draft: Partial<InvoiceDraft>): void;
   onAddLine(): void;
   onResetDueDate(): void;
   error: string | null;
-}): JSX.Element {
-  if (!draft)
+  printOnly?: boolean;
+  onIssue?: (numberOverride: string) => void;
+  issuing?: boolean;
+  issueMessage?: string | null;
+}
+
+export function InvoiceWorkspace(props: InvoiceWorkspaceProps): JSX.Element {
+  if (!props.draft)
     return (
       <section className="panel">
         <h2>Invoice draft</h2>
-        <p>{error ?? 'Loading draft…'}</p>
+        <p>{props.error ?? 'Loading draft…'}</p>
       </section>
     );
+  return <InvoiceWorkspaceContent {...props} draft={props.draft} />;
+}
+
+function InvoiceWorkspaceContent({
+  draft,
+  customers,
+  onChange,
+  onAddLine,
+  onResetDueDate,
+  error,
+  printOnly = false,
+  onIssue,
+  issuing = false,
+  issueMessage,
+}: Omit<InvoiceWorkspaceProps, 'draft'> & {
+  draft: InvoiceDraft;
+}): JSX.Element {
   const total = calculateInvoiceTotal(draft.lines);
   const previewRef = useRef<HTMLDivElement>(null);
   const rowHeights = useRef(new Map<string, number>());
   const [pageLines, setPageLines] = useState([draft.lines]);
   const [oversizedLineIds, setOversizedLineIds] = useState<string[]>([]);
   const [footerTooTall, setFooterTooTall] = useState(false);
+  const [numberOverride, setNumberOverride] = useState('');
+  useLayoutEffect(() => setNumberOverride(''), [draft.id]);
   const contentKey = useMemo(
     () =>
       JSON.stringify([
@@ -125,7 +143,11 @@ export function InvoiceWorkspace({
     return () => observer.disconnect();
   }, [contentKey, draft.lines]);
   return (
-    <section className="invoice-workspace">
+    <section
+      className={
+        printOnly ? 'invoice-workspace print-only' : 'invoice-workspace'
+      }
+    >
       {error && (
         <div className="error-banner" role="alert">
           <p>{error}</p>
@@ -133,6 +155,34 @@ export function InvoiceWorkspace({
       )}
       <section className="panel invoice-editor">
         <h2>Invoice draft</h2>
+        {issueMessage && <p role="status">{issueMessage}</p>}
+        {onIssue && (
+          <div className="issue-controls">
+            <label className="field">
+              Invoice number override
+              <input
+                value={numberOverride}
+                maxLength={80}
+                onChange={(event) => setNumberOverride(event.target.value)}
+                placeholder={draft.suggestedNumber}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={issuing}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Issue this invoice now? The issued PDF and snapshot are permanent.',
+                  )
+                )
+                  onIssue(numberOverride);
+              }}
+            >
+              {issuing ? 'Issuing…' : 'Issue invoice'}
+            </button>
+          </div>
+        )}
         <div className="form-grid">
           <label className="field">
             Customer

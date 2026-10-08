@@ -5,8 +5,8 @@ export function AppShell({
   onNavigate,
 }: {
   children: ReactNode;
-  active: 'customers' | 'settings' | 'invoice';
-  onNavigate(page: 'customers' | 'settings' | 'invoice'): void;
+  active: 'customers' | 'settings' | 'invoice' | 'archive';
+  onNavigate(page: 'customers' | 'settings' | 'invoice' | 'archive'): void;
 }): JSX.Element {
   return (
     <>
@@ -16,6 +16,16 @@ export function AppShell({
           <h1>Invoicing</h1>
         </div>
         <nav aria-label="Main navigation">
+          <button
+            type="button"
+            className={
+              active === 'archive' ? 'nav-button active' : 'nav-button'
+            }
+            aria-current={active === 'archive' ? 'page' : undefined}
+            onClick={() => onNavigate('archive')}
+          >
+            Archive
+          </button>
           <button
             type="button"
             className={

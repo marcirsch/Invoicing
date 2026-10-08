@@ -3,6 +3,10 @@ import type { IpcApi, Result } from '../shared/ipc/contracts';
 import type { Customer } from '../shared/domain/customer';
 import type { Settings } from '../shared/domain/settings';
 import type { InvoiceDraft } from '../shared/domain/invoice';
+import type {
+  IssuedInvoice,
+  InvoiceArchiveEntry,
+} from '../shared/domain/issuedInvoice';
 
 const api: IpcApi = {
   loadDraft: () =>
@@ -37,6 +41,20 @@ const api: IpcApi = {
     ipcRenderer.invoke('customers:delete', id) as Promise<Result<Customer[]>>,
   reloadCustomers: () =>
     ipcRenderer.invoke('customers:reload') as Promise<Result<Customer[]>>,
+  issueInvoice: (input) =>
+    ipcRenderer.invoke('invoice:issue', input) as Promise<
+      Result<IssuedInvoice>
+    >,
+  listInvoices: () =>
+    ipcRenderer.invoke('archive:list') as Promise<
+      Result<InvoiceArchiveEntry[]>
+    >,
+  readInvoice: (id) =>
+    ipcRenderer.invoke('archive:read', id) as Promise<Result<IssuedInvoice>>,
+  openInvoicePdf: (id) =>
+    ipcRenderer.invoke('archive:open-pdf', id) as Promise<Result<boolean>>,
+  revealInvoicePdf: (id) =>
+    ipcRenderer.invoke('archive:reveal-pdf', id) as Promise<Result<boolean>>,
 };
 
 contextBridge.exposeInMainWorld('invoicing', api);

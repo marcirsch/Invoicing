@@ -6,13 +6,14 @@ The planned app will run on macOS and Windows. It will let users manage customer
 
 ## Current status
 
-Phase 1 foundation and the Phase 2 invoice preparation flow are implemented: company settings include an optional local logo and recurring invoice footer; drafts synchronize saved sender details, support automatic or manual due dates, and show a content-measured multi-page A4 preview. Invoice issuance, PDF archival, and Swiss QR-bill generation remain Phase 3.
+Phase 1 and Phase 2 are implemented. Phase 3 issuance code is now present: issue-time validation, Chromium invoice printing through the preview component, SwissQRBill A4 payment-page generation, PDF assembly, journaled archive storage, and archive/replacement UI. Automated checks pass, but visual review of invoice PDFs, QR validator/scanner checks, failure/restart workflows, and Windows verification remain outstanding; do not treat Phase 3 or Phase 4 as release-complete yet.
 
 ## Planned technology
 
 - Electron and TypeScript for the desktop application
 - HTML and CSS for the invoice preview and invoice PDF pages
 - `swissqrbill` and PDFKit for Swiss QR-bill generation
+- `@cantoo/pdf-lib` for appending the QR-bill page
 - Local application storage for settings, the active draft, and issued-invoice metadata
 - `decimal.js` for exact draft calculations (each line rounded half-up to cents before summing)
 - A user-selected CSV file as the customer source of truth
@@ -31,7 +32,7 @@ Phase 1 establishes the desktop foundation and local data workflow:
 
 The app provides one editable invoice draft with customer and company snapshots, date and currency controls, stable-ID service rows, a suggested number that does not advance settings, debounced local persistence, and a content-measured A4 preview. Draft dates use `YYYY-MM-DD`; automatic due dates use calendar-day arithmetic and manual overrides persist until reset. Both invoice templates share the preview markup. The preview is not a PDF and contains no QR-bill.
 
-Phase 3 will add validated issuance, immutable snapshots, PDF archival, and a compliant Swiss QR-bill. Draft data is stored separately in `invoice-draft.json`; malformed saved data is retained and reported instead of silently replaced.
+Issued snapshots are stored in versioned `issued-invoices.json` under Electron user data. Final PDFs are written to the configured archive folder using invoice-number filenames; an app-data transaction journal supports recovery on first archive or issue access. Archive metadata remains available if the selected folder is moved, with the PDF marked unavailable. The service never replaces an existing PDF. SIX guidelines v2.3 are effective on 2026-10-07; v2.4 is scheduled for 2026-11-13, so standards and validator checks must be repeated before release. Draft data remains separate in `invoice-draft.json`; malformed saved data is preserved and reported.
 
 ## Documentation
 

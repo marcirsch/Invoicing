@@ -203,7 +203,7 @@ The repository currently contains the example invoice but no application code. V
 | App appearance | CSS theme tokens and operating-system color-scheme preference | Supports a System default and explicit Light/Dark overrides without changing invoice print styling. |
 | Invoice PDF | Electron Chromium print-to-PDF | Renders the HTML/CSS invoice using the same layout as the preview. |
 | Swiss QR-bill | swissqrbill with PDFKit | The library generates Swiss QR-bill PDFs and is designed for Node.js; use its PDF API for the standards-sensitive payment page. |
-| PDF assembly | A maintained Node PDF merge library (candidate: pdf-lib) | Appends the generated QR-bill page after the invoice PDF. Confirm page preservation and licensing during dependency selection. |
+| PDF assembly | `@cantoo/pdf-lib` 2.11.1 | Actively maintained MIT fork of pdf-lib; appends the generated QR-bill page after invoice pages. |
 | Customer data | User-selected CSV | Keeps the customer list human-readable and editable with common tools. |
 | Settings and invoice index | Local JSON or another simple local format | Keeps settings and history metadata local without requiring a server database. |
 | Packaging | Electron-compatible macOS and Windows packager | Produces desktop deliverables for the two required platforms. |
@@ -322,19 +322,19 @@ Indicative estimates assume one experienced full-stack developer and exclude ext
 
 **Goal:** Generate and preserve the final issued invoice.
 
-- ✅ Generate invoice PDF from HTML/CSS and Swiss QR-bill PDF from the selected invoice data.
-- ✅ Combine pages with the QR-bill last; validate fields before assigning the invoice number.
-- ✅ Write PDF, immutable snapshot, and archive index; implement correction-as-replacement flow.
+- ✅ Implement Chromium invoice PDF rendering from the shared preview component and SwissQRBill payment-page generation.
+- ✅ Implement A4 page assembly, issue-time validation, journaled archive storage, and replacement linkage.
+- ✅ Implement archive list/open/reveal and retry transaction IDs; automated unit/integration coverage is passing.
 
-**Validation:** Check page order and layout, validate the QR-bill payload, verify numbering behavior, and confirm issued records remain unchanged.
+**Validation status:** Automated tests cover exact cents, validation, PDF page dimensions/order, archive snapshots, and no-overwrite behavior. Visual checks of both templates and multi-page invoices, official QR-bill validator/scanner checks, complete crash/failure injection, and native open/reveal workflows remain outstanding. SIX v2.3 is in force on 2026-10-07; v2.4 is scheduled for 2026-11-13. Recheck the effective guideline before release.
 
 ### Phase 4: Cross-platform hardening and release packaging (1–2 weeks)
 
 **Goal:** Prepare repeatable macOS and Windows builds for user review.
 
-- ✅ Run end-to-end workflows for CSV, editing, preview, generation, and archive.
-- ✅ Package both platforms and test fresh installation and app-data behavior.
-- ✅ Complete accessibility, failure-state, and recovery review.
+- [ ] Run end-to-end workflows for CSV, editing, preview, generation, and archive on supported platforms.
+- [ ] Package macOS and Windows builds and test fresh installation and app-data behavior.
+- [ ] Complete accessibility, failure-state, and recovery review.
 
 **Validation:** A test user completes the sample workflow from setup through finding the archived PDF on each supported platform.
 

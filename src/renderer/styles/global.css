@@ -546,6 +546,21 @@ td {
   .invoice-pages {
     display: block;
   }
+  .print-only {
+    display: block !important;
+    margin: 0;
+    padding: 0;
+  }
+  .print-only .invoice-editor,
+  .print-only .invoice-layout-warning,
+  body:has(.print-only) .app-header {
+    display: none !important;
+  }
+  body:has(.print-only) main {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
   .invoice-paper {
     box-shadow: none;
     border: 0;

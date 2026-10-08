@@ -8,8 +8,19 @@ import { registerCustomerHandlers } from './customerHandlers';
 import { registerSettingsHandlers } from './settingsHandlers';
 import { DraftStore } from '../services/draftStore';
 import { invoiceDraftSchema } from '../../shared/validation/invoiceValidation';
+import { InvoiceArchiveStore } from '../services/invoiceArchiveStore';
+import {
+  InvoiceIssueError,
+  InvoiceIssuanceService,
+} from '../services/invoiceIssuanceService';
+import { registerInvoiceHandlers } from './invoiceHandlers';
 
 function safeFailure(error: unknown, fallback: string) {
+  if (error instanceof InvoiceIssueError)
+    return {
+      ok: false,
+      error: { code: error.code, message: error.message },
+    };
   if (error instanceof z.ZodError)
     return {
       ok: false,
@@ -56,6 +67,8 @@ export function registerHandlers(
   store: SettingsStore,
   customers: CustomerCsvService,
   drafts: DraftStore,
+  archive?: InvoiceArchiveStore,
+  issuance?: InvoiceIssuanceService,
 ): void {
   const register = (
     channel: string,
@@ -71,7 +84,9 @@ export function registerHandlers(
       } catch (error) {
         const fallback = channel.startsWith('customers:')
           ? 'Could not complete the customer operation. Check the selected file and its permissions.'
-          : 'Could not read or save settings.';
+          : channel === 'invoice:issue'
+            ? 'Could not issue the invoice. Your draft is retained; check the archive folder and try again.'
+            : 'Could not read or save settings.';
         return safeFailure(error, fallback);
       }
     });
@@ -99,6 +114,7 @@ export function registerHandlers(
   register('draft:save', async (_event, payload) =>
     drafts.save(invoiceDraftSchema.parse(payload)),
   );
+  if (archive && issuance) registerInvoiceHandlers(register, archive, issuance);
 }
 
 export type HandlerRegistrar = (
