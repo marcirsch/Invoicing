@@ -181,6 +181,16 @@ This is a starting proposal, not an existing repository convention.
 - Configure company/legal name, structured address, phone, email, website, logo, IBAN, bank name, invoice-number sequence, default currency, due-date term, template, optional footer note, and VAT note.
 - Preserve company profile settings in local application data, separate from the chosen customer CSV.
 - Validate required creditor data before QR-bill generation and identify missing fields in the UI.
+- Show live, field-level validation feedback for company details. Mark fields required for invoice issuance with an asterisk, highlight invalid controls, and keep validation messages accessible and readable in both application themes.
+- Use the invoice issuance requirements as the source of truth for required company fields. Optional fields remain optional; populated optional fields must still be validated where applicable (for example, email format).
+
+### Validation feedback (supplemental requirement)
+
+- Validate company settings and the invoice draft as the user edits them, so missing and malformed data is visible before saving settings or issuing an invoice.
+- Mark QR-bill issuance-required company fields and show live inline errors with accessible invalid state styling and descriptions.
+- On the invoice page, associate issuance validation errors with the customer, dates, company sender data, and individual service rows; show a page-level alert for issues that cannot be tied to one control, such as an invalid overall total.
+- When issuance is blocked, focus the first affected editor control and retain main-process issue validation as the final safeguard before numbering or archiving.
+- Use visible red invalid-state styling, inline explanations, required markers, and accessible `aria-invalid`/description relationships rather than relying on plain black error text alone.
 
 ### PDF generation and archive
 
@@ -291,6 +301,7 @@ A user can configure company details, select or create a customer CSV, prepare a
 - A returning user can create a routine invoice without re-entering company or customer details.
 - The current invoice amount and complete PDF layout are visible before issue.
 - Errors identify the missing or invalid field and provide a direct way to fix it.
+- Required fields are identifiable before entry, and invalid company or invoice draft values are highlighted while the user edits.
 
 ## 12. Implementation Phases
 

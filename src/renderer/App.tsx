@@ -12,6 +12,7 @@ import { InvoiceWorkspace } from './components/InvoiceWorkspace';
 import type { IssuedInvoice } from '../shared/domain/issuedInvoice';
 import { issuedInvoiceSchema } from '../shared/validation/issuedInvoiceValidation';
 import { InvoiceArchive } from './components/InvoiceArchive';
+import type { IssueIssue } from '../shared/invoice/issueValidation';
 
 type Page = 'customers' | 'settings' | 'invoice' | 'archive';
 export default function App(): JSX.Element {
@@ -82,6 +83,7 @@ function MainApp(): JSX.Element {
   );
   const [issuing, setIssuing] = useState(false);
   const [issueMessage, setIssueMessage] = useState<string | null>(null);
+  const [serverIssues, setServerIssues] = useState<IssueIssue[]>([]);
   const [replacesInvoiceId, setReplacesInvoiceId] = useState<string | null>(
     null,
   );
@@ -142,6 +144,7 @@ function MainApp(): JSX.Element {
   async function issueInvoice(numberOverride: string) {
     if (!invoice.draft || issuing) return;
     setIssuing(true);
+    setServerIssues([]);
     setIssueMessage('Validating and creating the invoice…');
     transactionId.current ??= crypto.randomUUID();
     const result = await window.invoicing.issueInvoice({
@@ -153,6 +156,7 @@ function MainApp(): JSX.Element {
     setIssuing(false);
     if (!result.ok) {
       setIssueMessage(result.error.message);
+      setServerIssues(result.error.issues ?? []);
       return;
     }
     const updatedSettings = await window.invoicing.getSettings();
@@ -246,6 +250,8 @@ function MainApp(): JSX.Element {
           onIssue={(number) => void issueInvoice(number)}
           issuing={issuing}
           issueMessage={issueMessage}
+          issueIssues={serverIssues}
+          onOpenSettings={() => setPage('settings')}
         />
       ) : page === 'archive' ? (
         <InvoiceArchive onReplace={(id) => void replaceInvoice(id)} />

@@ -10,6 +10,7 @@ import type { IssueInvoiceInput } from '../validation/issuedInvoiceValidation';
 export interface StructuredError {
   code: string;
   message: string;
+  issues?: import('../invoice/issueValidation').IssueIssue[];
 }
 export type Result<T> =
   { ok: true; value: T } | { ok: false; error: StructuredError };

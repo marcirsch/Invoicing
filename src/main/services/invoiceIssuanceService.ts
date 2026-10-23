@@ -18,6 +18,7 @@ export class InvoiceIssueError extends Error {
   constructor(
     message: string,
     readonly code: string,
+    readonly issues?: import('../../shared/invoice/issueValidation').IssueIssue[],
   ) {
     super(message);
     this.name = 'InvoiceIssueError';
@@ -64,6 +65,7 @@ export class InvoiceIssuanceService {
         throw new InvoiceIssueError(
           validation.issues.map((item) => item.message).join(' '),
           'validation',
+          validation.issues,
         );
       if (replacesInvoiceId && !(await this.archive.read(replacesInvoiceId)))
         throw new InvoiceIssueError(

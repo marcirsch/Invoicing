@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import type { Settings } from '../../shared/domain/settings';
 import { settingsSchema } from '../../shared/validation/settingsValidation';
 
@@ -24,7 +24,31 @@ export function SettingsForm({
   onSelectArchive,
   onSelectLogo,
 }: Props): JSX.Element {
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const errors = useMemo(() => {
+    const result: Record<string, string> = {};
+    const ids: Record<string, string> = {
+      'company.name': 'company-name',
+      'company.address.street': 'company-street',
+      'company.address.postalCode': 'company-postal',
+      'company.address.city': 'company-city',
+      'company.address.country': 'company-country',
+      'company.address.buildingNumber': 'company-building',
+      'company.email': 'company-email',
+      paymentTermDays: 'payment-days',
+      invoicePrefix: 'invoice-prefix',
+      invoiceYear: 'invoice-year',
+      nextSequence: 'invoice-sequence',
+    };
+    const parsed = settingsSchema.safeParse(settings);
+    if (!parsed.success)
+      for (const issue of parsed.error.issues) {
+        const id = ids[issue.path.join('.')];
+        if (id && !result[id]) result[id] = issue.message;
+      }
+    if (!settings.company.iban.trim())
+      result['company-iban'] = 'IBAN is required to issue a QR-bill.';
+    return result;
+  }, [settings]);
   const field = (
     label: string,
     id: string,
@@ -34,6 +58,16 @@ export function SettingsForm({
   ) => (
     <label className="field" htmlFor={id}>
       {label}
+      {[
+        'company-name',
+        'company-street',
+        'company-postal',
+        'company-city',
+        'company-country',
+        'company-iban',
+      ].includes(id)
+        ? ' *'
+        : ''}
       <input
         id={id}
         type={type}
@@ -51,33 +85,11 @@ export function SettingsForm({
   );
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = settingsSchema.safeParse(settings);
-    if (!result.success) {
-      const ids: Record<string, string> = {
-        'company.name': 'company-name',
-        'company.address.street': 'company-street',
-        'company.address.buildingNumber': 'company-building',
-        'company.address.postalCode': 'company-postal',
-        'company.address.city': 'company-city',
-        'company.address.country': 'company-country',
-        'company.phone': 'company-phone',
-        'company.email': 'company-email',
-        paymentTermDays: 'payment-days',
-        invoicePrefix: 'invoice-prefix',
-        invoiceYear: 'invoice-year',
-        nextSequence: 'invoice-sequence',
-      };
-      const next: Record<string, string> = {};
-      for (const issue of result.error.issues) {
-        const path = issue.path.join('.');
-        const id = ids[path];
-        if (id) next[id] = issue.message;
-      }
-      setErrors(next);
-      document.getElementById(Object.keys(next)[0] ?? '')?.focus();
+    const firstError = Object.keys(errors).find((id) => id !== 'company-iban');
+    if (firstError) {
+      document.getElementById(firstError)?.focus();
       return;
     }
-    setErrors({});
     await onSave();
   }
   const company = (key: keyof Settings['company'], value: string) =>

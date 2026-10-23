@@ -7,6 +7,10 @@ import {
   calculateInvoiceTotal,
   formatCurrency,
 } from '../../shared/invoice/money';
+import {
+  validateIssueDraft,
+  type IssueIssue,
+} from '../../shared/invoice/issueValidation';
 
 interface InvoiceWorkspaceProps {
   draft: InvoiceDraft | null;
@@ -19,6 +23,8 @@ interface InvoiceWorkspaceProps {
   onIssue?: (numberOverride: string) => void;
   issuing?: boolean;
   issueMessage?: string | null;
+  issueIssues?: IssueIssue[];
+  onOpenSettings?: () => void;
 }
 
 export function InvoiceWorkspace(props: InvoiceWorkspaceProps): JSX.Element {
@@ -43,6 +49,8 @@ function InvoiceWorkspaceContent({
   onIssue,
   issuing = false,
   issueMessage,
+  issueIssues = [],
+  onOpenSettings,
 }: Omit<InvoiceWorkspaceProps, 'draft'> & {
   draft: InvoiceDraft;
 }): JSX.Element {
@@ -53,6 +61,43 @@ function InvoiceWorkspaceContent({
   const [oversizedLineIds, setOversizedLineIds] = useState<string[]>([]);
   const [footerTooTall, setFooterTooTall] = useState(false);
   const [numberOverride, setNumberOverride] = useState('');
+  const currentIssues = printOnly
+    ? []
+    : validateIssueDraft(draft, numberOverride || draft.suggestedNumber).issues;
+  const liveIssues = [
+    ...currentIssues,
+    ...issueIssues.filter((serverIssue) =>
+      currentIssues.some(
+        (currentIssue) => currentIssue.field === serverIssue.field,
+      ),
+    ),
+  ];
+  const issueFor = (field: string) =>
+    liveIssues.find((item) => item.field === field)?.message;
+  const lineIssue = (lineId: string, field: string) => {
+    const index = draft.lines.findIndex((line) => line.id === lineId);
+    return (
+      issueFor(`lines.${index}.${field}`) ??
+      (field !== 'description' ? issueFor(`lines.${index}`) : undefined)
+    );
+  };
+  useLayoutEffect(() => {
+    if (issueIssues.length === 0) return;
+    const first = issueIssues[0]?.field;
+    const lineMatch = first?.match(/^lines\.(\d+)(?:\.(description))?$/);
+    const id = lineMatch
+      ? `line-${draft.lines[Number(lineMatch[1])]?.id ?? ''}-${lineMatch[2] ?? 'hours'}`
+      : first === 'customer'
+        ? 'invoice-customer'
+        : first === 'invoiceDate'
+          ? 'invoice-date'
+          : first === 'dueDate'
+            ? 'due-date'
+            : first === 'invoiceNumber'
+              ? 'invoice-number-override'
+              : null;
+    if (id) document.getElementById(id)?.focus();
+  }, [issueIssues, draft.lines]);
   useLayoutEffect(() => setNumberOverride(''), [draft.id]);
   const contentKey = useMemo(
     () =>
@@ -156,16 +201,49 @@ function InvoiceWorkspaceContent({
       <section className="panel invoice-editor">
         <h2>Invoice draft</h2>
         {issueMessage && <p role="status">{issueMessage}</p>}
+        {liveIssues
+          .filter((item) => item.field === 'lines' || item.field === 'total')
+          .map((item) => (
+            <p
+              className="field-error"
+              role="alert"
+              key={`${item.field}-${item.message}`}
+            >
+              {item.message}
+            </p>
+          ))}
+        {liveIssues.some((item) => item.field.startsWith('sender.')) && (
+          <p className="field-error">
+            Company details need attention.{' '}
+            <button
+              type="button"
+              className="text-button"
+              onClick={onOpenSettings}
+            >
+              Open Settings
+            </button>
+          </p>
+        )}
         {onIssue && (
           <div className="issue-controls">
             <label className="field">
               Invoice number override
               <input
+                id="invoice-number-override"
                 value={numberOverride}
+                aria-invalid={Boolean(issueFor('invoiceNumber'))}
+                aria-describedby={
+                  issueFor('invoiceNumber') ? 'invoice-number-error' : undefined
+                }
                 maxLength={80}
                 onChange={(event) => setNumberOverride(event.target.value)}
                 placeholder={draft.suggestedNumber}
               />
+              {issueFor('invoiceNumber') && (
+                <span id="invoice-number-error" className="field-error">
+                  {issueFor('invoiceNumber')}
+                </span>
+              )}
             </label>
             <button
               type="button"
@@ -187,6 +265,11 @@ function InvoiceWorkspaceContent({
           <label className="field">
             Customer
             <select
+              id="invoice-customer"
+              aria-invalid={Boolean(issueFor('customer'))}
+              aria-describedby={
+                issueFor('customer') ? 'invoice-customer-error' : undefined
+              }
               value={draft.customerId ?? ''}
               aria-label="Invoice customer"
               onChange={(event) => {
@@ -203,6 +286,11 @@ function InvoiceWorkspaceContent({
                 </option>
               ))}
             </select>
+            {issueFor('customer') && (
+              <span id="invoice-customer-error" className="field-error">
+                {issueFor('customer')}
+              </span>
+            )}
           </label>
           <label className="field">
             Suggested invoice number
@@ -211,20 +299,40 @@ function InvoiceWorkspaceContent({
           <label className="field">
             Invoice date
             <input
+              id="invoice-date"
+              aria-invalid={Boolean(issueFor('invoiceDate'))}
+              aria-describedby={
+                issueFor('invoiceDate') ? 'invoice-date-error' : undefined
+              }
               type="date"
               value={draft.invoiceDate}
               onChange={(event) =>
                 onChange({ invoiceDate: event.target.value })
               }
             />
+            {issueFor('invoiceDate') && (
+              <span id="invoice-date-error" className="field-error">
+                {issueFor('invoiceDate')}
+              </span>
+            )}
           </label>
           <label className="field">
             Due date
             <input
+              id="due-date"
+              aria-invalid={Boolean(issueFor('dueDate'))}
+              aria-describedby={
+                issueFor('dueDate') ? 'due-date-error' : undefined
+              }
               type="date"
               value={draft.dueDate}
               onChange={(event) => onChange({ dueDate: event.target.value })}
             />
+            {issueFor('dueDate') && (
+              <span id="due-date-error" className="field-error">
+                {issueFor('dueDate')}
+              </span>
+            )}
           </label>
           {draft.dueDateMode === 'manual' && (
             <button
@@ -288,6 +396,15 @@ function InvoiceWorkspaceContent({
                   <tr key={line.id}>
                     <td className="service-description-cell">
                       <input
+                        id={`line-${line.id}-description`}
+                        aria-invalid={Boolean(
+                          lineIssue(line.id, 'description'),
+                        )}
+                        aria-describedby={
+                          lineIssue(line.id, 'description')
+                            ? `line-${line.id}-description-error`
+                            : undefined
+                        }
                         aria-label="Service description"
                         value={line.description}
                         onChange={(event) =>
@@ -300,9 +417,24 @@ function InvoiceWorkspaceContent({
                           })
                         }
                       />
+                      {lineIssue(line.id, 'description') && (
+                        <span
+                          id={`line-${line.id}-description-error`}
+                          className="field-error"
+                        >
+                          {lineIssue(line.id, 'description')}
+                        </span>
+                      )}
                     </td>
                     <td className="service-numeric-cell">
                       <input
+                        id={`line-${line.id}-hours`}
+                        aria-invalid={Boolean(lineIssue(line.id, 'hours'))}
+                        aria-describedby={
+                          lineIssue(line.id, 'hours')
+                            ? `line-${line.id}-hours-error`
+                            : undefined
+                        }
                         aria-label="Hours"
                         inputMode="decimal"
                         value={line.hours}
@@ -316,9 +448,24 @@ function InvoiceWorkspaceContent({
                           })
                         }
                       />
+                      {lineIssue(line.id, 'hours') && (
+                        <span
+                          id={`line-${line.id}-hours-error`}
+                          className="field-error"
+                        >
+                          {lineIssue(line.id, 'hours')}
+                        </span>
+                      )}
                     </td>
                     <td className="service-numeric-cell">
                       <input
+                        id={`line-${line.id}-rate`}
+                        aria-invalid={Boolean(lineIssue(line.id, 'rate'))}
+                        aria-describedby={
+                          lineIssue(line.id, 'rate')
+                            ? `line-${line.id}-rate-error`
+                            : undefined
+                        }
                         aria-label="Rate"
                         inputMode="decimal"
                         value={line.rate}
@@ -332,6 +479,14 @@ function InvoiceWorkspaceContent({
                           })
                         }
                       />
+                      {lineIssue(line.id, 'rate') && (
+                        <span
+                          id={`line-${line.id}-rate-error`}
+                          className="field-error"
+                        >
+                          {lineIssue(line.id, 'rate')}
+                        </span>
+                      )}
                     </td>
                     <td className="service-amount-cell">
                       {amount.valid

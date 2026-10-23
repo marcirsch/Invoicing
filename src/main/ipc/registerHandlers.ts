@@ -19,7 +19,7 @@ function safeFailure(error: unknown, fallback: string) {
   if (error instanceof InvoiceIssueError)
     return {
       ok: false,
-      error: { code: error.code, message: error.message },
+      error: { code: error.code, message: error.message, issues: error.issues },
     };
   if (error instanceof z.ZodError)
     return {

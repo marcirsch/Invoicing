@@ -42,6 +42,34 @@ describe('settings validation', () => {
       settingsSchema.safeParse({ ...complete, currency: 'EUR' }).success,
     ).toBe(true);
   });
+  it('allows blank IBAN for settings save while issuance validation requires it', async () => {
+    const { validateIssueDraft } =
+      await import('../../src/shared/invoice/issueValidation');
+    expect(settingsSchema.safeParse(complete).success).toBe(true);
+    expect(settingsSchema.parse(complete).company.iban).toBe('');
+    // The issue validator independently requires a valid creditor IBAN.
+    expect(
+      validateIssueDraft({
+        id: 'draft',
+        invoiceDate: '2026-10-01',
+        dueDate: '2026-10-31',
+        currency: 'CHF',
+        suggestedNumber: 'RE-2026-001',
+        customerId: null,
+        customer: null,
+        sender: { ...defaultSettings.company, ...complete.company, iban: '' },
+        lines: [],
+        template: 'classic',
+        notes: '',
+        invoiceFooter: '',
+        dueDateMode: 'manual',
+      }).issues,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'sender.iban' }),
+      ]),
+    );
+  });
   it('rejects missing required identity, invalid email, and invalid numeric values', () => {
     expect(
       settingsSchema.safeParse({
