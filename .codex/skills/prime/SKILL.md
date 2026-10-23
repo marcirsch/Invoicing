@@ -39,6 +39,8 @@ Check recent activity with `git log -10 --oneline` when available.
 
 Check current branch and status with Git when available.
 
+When the repository has phased plans or checklists, use Git history and the current implementation to identify the active phase. Treat plan checkmarks as claims to verify, not as the only evidence of completion. Compare relevant commits and current code with the phase acceptance criteria, and report the next phase that lacks implementation evidence. If the evidence is ambiguous or the user explicitly identifies the phase, state that and follow the user's direction.
+
 ## Output Report
 
 Provide a concise summary covering:

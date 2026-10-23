@@ -213,6 +213,8 @@ The renderer-to-issue boundary continues to carry the selected invoice number wi
 
 ### Phase 1: Number proposal synchronization
 
+**Status:** Implemented.
+
 **Goal:** Make the proposed and effective invoice number consistent throughout an open draft.
 
 - ✅ Use a single editable field initialized from the current proposal.
@@ -225,39 +227,47 @@ The renderer-to-issue boundary continues to carry the selected invoice number wi
 
 ### Phase 2: Validation timing and recovery
 
+**Status:** Not implemented. This is the next phase.
+
 **Goal:** Remove premature errors and make failed issue attempts easy to correct.
 
-- ✅ Gate issue validation feedback on an explicit issue attempt.
-- ✅ Add one blank row when an issue attempt has no rows.
-- ✅ Add field-associated error styling, a concise form summary, first-error focus, and stable row-wide feedback placement.
-- ✅ Keep main-process validation authoritative.
+- [ ] Gate issue validation feedback on an explicit issue attempt.
+- [ ] Add one blank row when an issue attempt has no rows.
+- [ ] Add field-associated error styling, a concise form summary, first-error focus, and stable row-wide feedback placement.
+- [ ] Keep main-process validation authoritative.
 
 **Validation:** Cover empty draft, blank row, partial row, invalid amount, zero total, sender/customer/date errors, correction, and duplicate number paths.  
 **Estimate:** 1–2 engineering days.
 
 ### Phase 3: Preview fit and issue action
 
+**Status:** Not implemented.
+
 **Goal:** Make the preview responsive and keep issuance accessible during editing.
 
-- ✅ Fit preview pages to the available pane width on resize, without affecting print output.
-- ✅ Add a persistent editor-aligned issue bar with number and total context.
-- ✅ Handle short-height and zoom layouts without obscuring content or focus.
+- [ ] Fit preview pages to the available pane width on resize, without affecting print output.
+- [ ] Add a persistent editor-aligned issue bar with number and total context.
+- [ ] Handle short-height and zoom layouts without obscuring content or focus.
 
 **Validation:** Inspect small, standard, and expanded windows, resize behavior, keyboard tabbing, screen-only scaling, and A4 print output.  
 **Estimate:** 1–2 engineering days.
 
 ### Phase 4: Consolidate CSV controls and regression review
 
+**Status:** Not implemented.
+
 **Goal:** Make Customers the only place to select or create a customer CSV and verify end-to-end behavior.
 
-- ✅ Remove CSV actions and initialization prompts from Settings while preserving archive-folder settings.
-- ✅ Verify the Customers CSV workflows and read-only path display in Settings.
-- ✅ Run repository checks and perform a complete invoice creation/issue workflow.
+- [ ] Remove CSV actions and initialization prompts from Settings while preserving archive-folder settings.
+- [ ] Verify the Customers CSV workflows and read-only path display in Settings.
+- [ ] Run repository checks and perform a complete invoice creation/issue workflow.
 
 **Validation:** Existing CSV integration tests, typecheck, lint, format check, unit/integration tests, build, smoke run, and manual Electron checks pass.  
 **Estimate:** 0.5–1 engineering day.
 
 ### Phase 5: Restore service dates on invoice rows
+
+**Status:** Not implemented.
 
 **Goal:** Let users select a date for each service row and preserve it throughout the draft, preview, and issued invoice.
 
