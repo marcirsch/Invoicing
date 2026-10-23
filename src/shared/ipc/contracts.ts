@@ -19,6 +19,9 @@ export interface IpcApi {
   saveDraft(draft: InvoiceDraft): Promise<Result<InvoiceDraft>>;
   getSettings(): Promise<Result<Settings>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
+  setAppearance(
+    appearance: Settings['appearance'],
+  ): Promise<Result<Settings['appearance']>>;
   selectCsv(): Promise<Result<string | null>>;
   selectArchiveFolder(): Promise<Result<string | null>>;
   selectInvoiceLogo(): Promise<Result<string | null>>;

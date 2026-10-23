@@ -36,6 +36,12 @@ export const settingsBaseSchema = z.object({
 });
 export const settingsSchema = settingsBaseSchema.superRefine(
   (settings, context) => {
+    if (settings.paymentTermDays > 3650)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Payment term must be 3650 days or fewer.',
+        path: ['paymentTermDays'],
+      });
     const values: [string, string][] = [
       ['company.name', settings.company.name],
       ['company.address.street', settings.company.address.street],

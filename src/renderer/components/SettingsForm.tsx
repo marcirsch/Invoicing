@@ -71,6 +71,7 @@ export function SettingsForm({
       <input
         id={id}
         type={type}
+        {...(id === 'payment-days' ? { min: 0, max: 3650, step: 1 } : {})}
         value={value}
         aria-invalid={Boolean(errors[id])}
         aria-describedby={errors[id] ? `${id}-error` : undefined}
@@ -234,23 +235,6 @@ export function SettingsForm({
           {field('Template', 'invoice-template', settings.template, (value) =>
             onChange({ ...settings, template: value }),
           )}
-          <label className="field" htmlFor="appearance">
-            App appearance
-            <select
-              id="appearance"
-              value={settings.appearance}
-              onChange={(event) =>
-                onChange({
-                  ...settings,
-                  appearance: event.target.value as Settings['appearance'],
-                })
-              }
-            >
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </label>
         </div>
         <label className="field settings-footer" htmlFor="invoice-footer">
           Invoice footer text

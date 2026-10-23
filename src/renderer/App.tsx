@@ -104,14 +104,15 @@ function MainApp(): JSX.Element {
         result.error.code === 'dialect_ambiguous',
       );
     } else if (result.value) {
-      await settings.refresh();
+      settings.setSettings({ ...settings.settings, csvPath: result.value });
       await customerState.refresh();
     }
   }
   async function chooseArchive() {
     const result = await window.invoicing.selectArchiveFolder();
     if (!result.ok) settings.setError(result.error.message);
-    else if (result.value) await settings.refresh();
+    else if (result.value)
+      settings.setSettings({ ...settings.settings, archivePath: result.value });
   }
   async function chooseLogo() {
     const result = await window.invoicing.selectInvoiceLogo();
@@ -123,7 +124,24 @@ function MainApp(): JSX.Element {
       });
   }
   async function chooseDelimiter(delimiter: ',' | ';' | '\t') {
-    if (await customerState.refresh(delimiter)) await settings.refresh();
+    await customerState.refresh(delimiter);
+  }
+  async function changeAppearance(appearance: 'system' | 'light' | 'dark') {
+    const persisted = settings.settings.appearance;
+    settings.setSettings({ ...settings.settings, appearance });
+    const result = await window.invoicing.setAppearance(appearance);
+    if (result.ok)
+      settings.setSettings((current) => ({
+        ...current,
+        appearance: result.value,
+      }));
+    else {
+      settings.setSettings((current) => ({
+        ...current,
+        appearance: persisted,
+      }));
+      settings.setError(result.error.message);
+    }
   }
   async function saveSettings(): Promise<boolean> {
     const saved = await settings.save(settings.settings);
@@ -202,7 +220,12 @@ function MainApp(): JSX.Element {
   }
 
   return (
-    <AppShell active={page} onNavigate={setPage}>
+    <AppShell
+      active={page}
+      onNavigate={setPage}
+      appearance={settings.settings.appearance}
+      onAppearanceChange={changeAppearance}
+    >
       {customerState.error && (
         <ErrorMessage
           message={customerState.error}

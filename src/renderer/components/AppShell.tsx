@@ -3,10 +3,14 @@ export function AppShell({
   children,
   active,
   onNavigate,
+  appearance,
+  onAppearanceChange,
 }: {
   children: ReactNode;
   active: 'customers' | 'settings' | 'invoice' | 'archive';
   onNavigate(page: 'customers' | 'settings' | 'invoice' | 'archive'): void;
+  appearance: 'system' | 'light' | 'dark';
+  onAppearanceChange(appearance: 'system' | 'light' | 'dark'): void;
 }): JSX.Element {
   return (
     <>
@@ -57,6 +61,20 @@ export function AppShell({
             Settings
           </button>
         </nav>
+        <label className="header-appearance" htmlFor="appearance">
+          Appearance
+          <select
+            id="appearance"
+            value={appearance}
+            onChange={(event) =>
+              onAppearanceChange(event.target.value as typeof appearance)
+            }
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
       </header>
       <main>{children}</main>
     </>

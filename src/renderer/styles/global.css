@@ -525,6 +525,62 @@ td {
 .preview-customer {
   min-height: 0;
 }
+.preview-target {
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.preview-target:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.preview-target:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.qr-bill-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 210mm;
+  max-width: 210mm;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+}
+.qr-bill-preview-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 210mm;
+  height: 105mm;
+}
+.qr-bill-svg {
+  width: 100%;
+  height: 105mm;
+}
+.qr-bill-svg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.qr-bill-incomplete {
+  margin: auto;
+  padding: 2rem;
+  max-width: 38rem;
+}
+.header-appearance {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
 .preview-total {
   display: flex;
   justify-content: flex-end;
@@ -573,6 +629,12 @@ td {
     max-width: none;
     margin: 0;
     padding: 0;
+  }
+  .preview-target {
+    appearance: none;
+  }
+  .qr-bill-preview {
+    display: none;
   }
   .invoice-paper {
     box-shadow: none;

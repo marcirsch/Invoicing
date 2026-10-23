@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { assignMeasuredPages } from '../../src/renderer/invoice/assignMeasuredPages';
+import { resolvePageLines } from '../../src/renderer/invoice/resolvePageLines';
 
 const ids = (pages: { id: string }[][]) =>
   pages.map((page) => page.map((row) => row.id));
 
 describe('measured invoice page assignment', () => {
+  it('resolves stable page IDs to the current draft line values', () => {
+    const first = [{ id: 'one', description: 'Old', hours: '1', rate: '10' }];
+    const changed = [{ id: 'one', description: 'New', hours: '2', rate: '30' }];
+    expect(resolvePageLines([['one']], first)[0]).toEqual(first);
+    expect(resolvePageLines([['one']], changed)[0]).toEqual(changed);
+  });
   const capacities = {
     first: 100,
     continuation: 80,

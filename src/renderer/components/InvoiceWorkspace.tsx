@@ -2,6 +2,8 @@ import type { InvoiceDraft } from '../../shared/domain/invoice';
 import type { Customer } from '../../shared/domain/customer';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { assignMeasuredPages } from '../invoice/assignMeasuredPages';
+import { resolvePageLines } from '../invoice/resolvePageLines';
+import { QrBillPreview } from './QrBillPreview';
 import {
   calculateLineAmount,
   calculateInvoiceTotal,
@@ -57,13 +59,17 @@ function InvoiceWorkspaceContent({
   const total = calculateInvoiceTotal(draft.lines);
   const previewRef = useRef<HTMLDivElement>(null);
   const rowHeights = useRef(new Map<string, number>());
-  const [pageLines, setPageLines] = useState([draft.lines]);
+  const [pageLineIds, setPageLineIds] = useState([
+    draft.lines.map((line) => line.id),
+  ]);
+  const pageLines = resolvePageLines(pageLineIds, draft.lines);
   const [oversizedLineIds, setOversizedLineIds] = useState<string[]>([]);
   const [footerTooTall, setFooterTooTall] = useState(false);
   const [numberOverride, setNumberOverride] = useState('');
   const currentIssues = printOnly
     ? []
-    : validateIssueDraft(draft, numberOverride || draft.suggestedNumber).issues;
+    : validateIssueDraft(draft, numberOverride.trim() || draft.suggestedNumber)
+        .issues;
   const liveIssues = [
     ...currentIssues,
     ...issueIssues.filter((serverIssue) =>
@@ -81,6 +87,7 @@ function InvoiceWorkspaceContent({
       (field !== 'description' ? issueFor(`lines.${index}`) : undefined)
     );
   };
+  const displayedInvoiceNumber = numberOverride.trim() || draft.suggestedNumber;
   useLayoutEffect(() => {
     if (issueIssues.length === 0) return;
     const first = issueIssues[0]?.field;
@@ -115,10 +122,10 @@ function InvoiceWorkspaceContent({
     const root = previewRef.current;
     if (!root) return;
     const measure = () => {
-      const paper = root.querySelector<HTMLElement>('.invoice-paper');
+      const paper = root.querySelector<HTMLElement>('.invoice-page');
       if (!paper) return;
       const paperHeight = paper.getBoundingClientRect().height;
-      const firstPage = root.querySelector<HTMLElement>('.invoice-paper');
+      const firstPage = root.querySelector<HTMLElement>('.invoice-page');
       if (!firstPage) return;
       const innerHeight = paperHeight * (1 - 0.072 * 2);
       const regionHeight = (selector: string, page: HTMLElement | null) =>
@@ -134,9 +141,10 @@ function InvoiceWorkspaceContent({
       );
       const tableHeadingHeight =
         firstPage.querySelector('thead')?.getBoundingClientRect().height ?? 0;
-      const closingPage = root.querySelector<HTMLElement>(
-        '.invoice-paper:last-child',
-      );
+      const closingPage =
+        Array.from(root.querySelectorAll<HTMLElement>('.invoice-page')).at(
+          -1,
+        ) ?? null;
       const closingHeight = regionHeight(
         '.preview-total, .invoice-notes',
         closingPage,
@@ -162,11 +170,11 @@ function InvoiceWorkspaceContent({
       const pages = assignment.pages.map((rows) =>
         rows.map(({ height: _height, ...line }) => line),
       );
-      setPageLines((current) =>
-        JSON.stringify(current.map((rows) => rows.map((row) => row.id))) ===
+      setPageLineIds((current) =>
+        JSON.stringify(current) ===
         JSON.stringify(pages.map((rows) => rows.map((row) => row.id)))
           ? current
-          : pages,
+          : pages.map((rows) => rows.map((row) => row.id)),
       );
     };
     root
@@ -550,7 +558,7 @@ function InvoiceWorkspaceContent({
         {pageLines.map((lines, pageIndex) => (
           <section
             key={pageIndex}
-            className={`invoice-paper ${draft.template}`}
+            className={`invoice-paper invoice-page ${draft.template}`}
             aria-label={`Invoice preview page ${pageIndex + 1}`}
           >
             {pageIndex === 0 && (
@@ -616,7 +624,13 @@ function InvoiceWorkspaceContent({
                 </div>
                 <div className="invoice-recipient-block">
                   <div className="preview-customer">
-                    <strong>{draft.customer?.name ?? 'Customer'}</strong>
+                    <PreviewTarget
+                      fieldId="invoice-customer"
+                      label="Select invoice customer"
+                      printOnly={printOnly}
+                    >
+                      <strong>{draft.customer?.name ?? 'Customer'}</strong>
+                    </PreviewTarget>
                     <p>
                       {draft.customer?.address.street}{' '}
                       {draft.customer?.address.buildingNumber}
@@ -645,11 +659,29 @@ function InvoiceWorkspaceContent({
                 <h2>RECHNUNG</h2>
                 <div className="invoice-meta-grid">
                   <strong>Rechnungsdatum</strong>
-                  <strong>{formatInvoiceDate(draft.invoiceDate)}</strong>
+                  <PreviewTarget
+                    fieldId="invoice-date"
+                    label="Invoice date"
+                    printOnly={printOnly}
+                  >
+                    <strong>{formatInvoiceDate(draft.invoiceDate)}</strong>
+                  </PreviewTarget>
                   <strong>Zahlbar bis</strong>
-                  <strong>{formatInvoiceDate(draft.dueDate)}</strong>
+                  <PreviewTarget
+                    fieldId="due-date"
+                    label="Due date"
+                    printOnly={printOnly}
+                  >
+                    <strong>{formatInvoiceDate(draft.dueDate)}</strong>
+                  </PreviewTarget>
                   <strong>Rechnungsnummer</strong>
-                  <strong>{draft.suggestedNumber}</strong>
+                  <PreviewTarget
+                    fieldId="invoice-number-override"
+                    label="Invoice number"
+                    printOnly={printOnly}
+                  >
+                    <strong>{displayedInvoiceNumber}</strong>
+                  </PreviewTarget>
                 </div>
               </section>
             )}
@@ -684,11 +716,33 @@ function InvoiceWorkspaceContent({
                           1}
                         .
                       </td>
-                      <td>{line.description || 'Service'}</td>
+                      <td>
+                        <PreviewTarget
+                          fieldId={`line-${line.id}-description`}
+                          label={`Edit description for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
+                          printOnly={printOnly}
+                        >
+                          {line.description || 'Service'}
+                        </PreviewTarget>
+                      </td>
                       <td>{formatInvoiceDate(draft.invoiceDate)}</td>
-                      <td className="invoice-number-cell">{line.hours}</td>
                       <td className="invoice-number-cell">
-                        {line.rate} {draft.currency}
+                        <PreviewTarget
+                          fieldId={`line-${line.id}-hours`}
+                          label={`Edit hours for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
+                          printOnly={printOnly}
+                        >
+                          {line.hours}
+                        </PreviewTarget>
+                      </td>
+                      <td className="invoice-number-cell">
+                        <PreviewTarget
+                          fieldId={`line-${line.id}-rate`}
+                          label={`Edit rate for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
+                          printOnly={printOnly}
+                        >
+                          {line.rate} {draft.currency}
+                        </PreviewTarget>
                       </td>
                       <td className="invoice-number-cell">
                         {value.valid
@@ -720,6 +774,9 @@ function InvoiceWorkspaceContent({
             )}
           </section>
         ))}
+        {!printOnly && (
+          <QrBillPreview draft={draft} invoiceNumber={displayedInvoiceNumber} />
+        )}
       </div>
     </section>
   );
@@ -727,6 +784,34 @@ function InvoiceWorkspaceContent({
 
 function settingsLogo(dataUrl: string | null | undefined): string | null {
   return dataUrl ?? null;
+}
+
+function PreviewTarget({
+  fieldId,
+  label,
+  children,
+  printOnly = false,
+}: {
+  fieldId: string;
+  label: string;
+  children: import('react').ReactNode;
+  printOnly?: boolean;
+}): JSX.Element {
+  if (printOnly) return <>{children}</>;
+  return (
+    <button
+      type="button"
+      className="preview-target"
+      aria-label={label}
+      onClick={() => {
+        const field = document.getElementById(fieldId);
+        field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        field?.focus();
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
 function formatInvoiceDate(value: string): string {

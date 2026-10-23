@@ -15,7 +15,12 @@ function createDraft(settings: Settings, customers: Customer[]): InvoiceDraft {
   return {
     id: crypto.randomUUID(),
     invoiceDate: date,
-    dueDate: addCalendarDays(date, settings.paymentTermDays),
+    dueDate: addCalendarDays(
+      date,
+      validPaymentTerm(settings.paymentTermDays)
+        ? settings.paymentTermDays
+        : 30,
+    ),
     currency: settings.currency,
     suggestedNumber: `${settings.invoicePrefix}${settings.invoiceYear}-${String(settings.nextSequence).padStart(3, '0')}`,
     customerId: customer?.id ?? null,
@@ -27,6 +32,9 @@ function createDraft(settings: Settings, customers: Customer[]): InvoiceDraft {
     invoiceFooter: settings.invoiceFooter,
     dueDateMode: 'automatic',
   };
+}
+function validPaymentTerm(days: number): boolean {
+  return Number.isInteger(days) && days >= 0 && days <= 3650;
 }
 export function useInvoiceDraft(
   settings: Settings,
@@ -66,7 +74,8 @@ export function useInvoiceDraft(
         change.invoiceDate !== undefined &&
         change.invoiceDate !== current.invoiceDate &&
         current.dueDateMode === 'automatic' &&
-        isIsoDate(change.invoiceDate)
+        isIsoDate(change.invoiceDate) &&
+        validPaymentTerm(settings.paymentTermDays)
       )
         next.dueDate = addCalendarDays(
           change.invoiceDate,
@@ -98,7 +107,8 @@ export function useInvoiceDraft(
     if (
       !draft ||
       draft.dueDateMode !== 'automatic' ||
-      !isIsoDate(draft.invoiceDate)
+      !isIsoDate(draft.invoiceDate) ||
+      !validPaymentTerm(settings.paymentTermDays)
     )
       return;
     const dueDate = addCalendarDays(
@@ -114,7 +124,12 @@ export function useInvoiceDraft(
     settings.paymentTermDays,
   ]);
   function resetDueDate() {
-    if (!draft || !isIsoDate(draft.invoiceDate)) return;
+    if (
+      !draft ||
+      !isIsoDate(draft.invoiceDate) ||
+      !validPaymentTerm(settings.paymentTermDays)
+    )
+      return;
     setDraft({
       ...draft,
       dueDateMode: 'automatic',

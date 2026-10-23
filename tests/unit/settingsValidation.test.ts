@@ -72,6 +72,22 @@ describe('settings validation', () => {
   });
   it('rejects missing required identity, invalid email, and invalid numeric values', () => {
     expect(
+      settingsSchema.safeParse({ ...complete, paymentTermDays: 0 }).success,
+    ).toBe(true);
+    expect(
+      settingsSchema.safeParse({ ...complete, paymentTermDays: 3650 }).success,
+    ).toBe(true);
+    expect(
+      settingsSchema.safeParse({ ...complete, paymentTermDays: -1 }).success,
+    ).toBe(false);
+    expect(
+      settingsSchema.safeParse({ ...complete, paymentTermDays: 3651 }).success,
+    ).toBe(false);
+    expect(
+      settingsBaseSchema.safeParse({ ...complete, paymentTermDays: 4000 })
+        .success,
+    ).toBe(true);
+    expect(
       settingsSchema.safeParse({
         ...complete,
         company: { ...complete.company, name: '' },

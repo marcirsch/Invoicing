@@ -17,6 +17,10 @@ const api: IpcApi = {
     ipcRenderer.invoke('settings:get') as Promise<Result<Settings>>,
   saveSettings: (settings) =>
     ipcRenderer.invoke('settings:save', settings) as Promise<Result<Settings>>,
+  setAppearance: (appearance) =>
+    ipcRenderer.invoke('settings:set-appearance', appearance) as Promise<
+      Result<Settings['appearance']>
+    >,
   selectCsv: () =>
     ipcRenderer.invoke('settings:select-csv') as Promise<Result<string | null>>,
   selectArchiveFolder: () =>

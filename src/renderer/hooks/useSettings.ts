@@ -27,7 +27,10 @@ export function useSettings() {
     setSaving(false);
     return result.ok;
   }, []);
-  const set = useCallback((value: Settings) => setSettings(value), []);
+  const set = useCallback(
+    (value: React.SetStateAction<Settings>) => setSettings(value),
+    [],
+  );
   return {
     settings,
     setSettings: set,

@@ -1,7 +1,10 @@
 import { BrowserWindow, nativeTheme } from 'electron';
 import type { CsvDelimiter } from '../../shared/csv/dialect';
 import type { Settings } from '../../shared/domain/settings';
-import { settingsSchema } from '../../shared/validation/settingsValidation';
+import {
+  settingsBaseSchema,
+  settingsSchema,
+} from '../../shared/validation/settingsValidation';
 import {
   selectArchiveFolder,
   selectCsv,
@@ -23,6 +26,13 @@ export function registerSettingsHandlers(
     const saved = await store.save(settings);
     nativeTheme.themeSource = saved.appearance;
     return saved;
+  });
+  register('settings:set-appearance', async (_event, payload) => {
+    const appearance = settingsBaseSchema.shape.appearance.parse(payload);
+    const current = await store.load();
+    const saved = await store.savePreferences({ ...current, appearance });
+    nativeTheme.themeSource = saved.appearance;
+    return saved.appearance;
   });
   register('settings:select-csv', async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
