@@ -282,8 +282,8 @@ function InvoiceWorkspaceContent({
               </span>
             )}
           </label>
-          <label className="field">
-            Invoice number
+          <div className="field">
+            <label htmlFor="invoice-number">Invoice number</label>
             <input
               id="invoice-number"
               value={draft.suggestedNumber}
@@ -301,15 +301,20 @@ function InvoiceWorkspaceContent({
                 {issueFor('invoiceNumber')}
               </span>
             )}
-            <button
-              type="button"
-              className="text-button"
-              disabled={draft.suggestedNumber === proposal}
-              onClick={() => onChange({ suggestedNumber: proposal })}
-            >
-              Revert to proposed number
-            </button>
-          </label>
+            <div className="invoice-number-proposal">
+              <span>
+                Proposal: <strong>{proposal}</strong>
+              </span>
+              <button
+                type="button"
+                className="proposal-action"
+                disabled={draft.suggestedNumber === proposal}
+                onClick={() => onChange({ suggestedNumber: proposal })}
+              >
+                Use proposal
+              </button>
+            </div>
+          </div>
           <label className="field">
             Invoice date
             <input

@@ -142,6 +142,39 @@ main {
   font-size: 0.82rem;
   font-weight: 500;
 }
+.invoice-number-proposal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.invoice-number-proposal strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.proposal-action {
+  min-height: 0;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.proposal-action:hover:not(:disabled) {
+  filter: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.proposal-action:disabled {
+  color: var(--muted);
+  opacity: 0.72;
+}
 .field input[aria-invalid='true'],
 .field select[aria-invalid='true'],
 .field textarea[aria-invalid='true'],
