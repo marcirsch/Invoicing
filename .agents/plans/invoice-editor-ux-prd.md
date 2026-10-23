@@ -7,9 +7,9 @@
 
 ## 1. Executive Summary
 
-The Local Invoicing App already supports invoice editing, live paginated preview, issue-time validation, PDF issuance, and customer CSV management. Recent use has exposed several connected workflow problems: invoice-number proposals are separated from the override field, preview pages can be too wide for the available pane, the issue action is difficult to reach, issue errors appear before the user attempts to issue, and the CSV source can be changed from both Customers and Settings.
+The Local Invoicing App already supports invoice editing, live paginated preview, issue-time validation, PDF issuance, and customer CSV management. Recent use has exposed several connected workflow problems: invoice-number proposals are separated from the override field, preview pages can be too wide for the available pane, the issue action is difficult to reach, issue errors appear before the user attempts to issue, the CSV source can be changed from both Customers and Settings, and users cannot select a service date for an invoice row.
 
-This change improves those existing workflows without changing the invoice domain, issued-record format, or security model. The invoice editor will present one effective invoice number, keep the preview within its available width, keep the issue action accessible, and defer issue errors until the user tries to issue. Customer CSV selection and creation will be managed only from Customers.
+This change improves those existing workflows while preserving the security model and compatibility with existing drafts and issued records. The invoice editor will present one effective invoice number, allow a service date on each invoice row, keep the preview within its available width, keep the issue action accessible, and defer issue errors until the user tries to issue. Customer CSV selection and creation will be managed only from Customers.
 
 **Goal:** Make preparing, reviewing, and issuing an invoice predictable on small and standard screens, while preserving accurate previews and immutable issued records.
 
@@ -50,18 +50,19 @@ Help a small-business user complete and review an invoice confidently before the
 - ✅ Defer invoice-issue validation feedback until the user attempts issuance; then associate errors with relevant controls and focus the first invalid control.
 - ✅ On an issue attempt with no service rows, add a blank row and show actionable validation feedback.
 - ✅ Restrict customer CSV selection, creation, and initialization to the Customers area.
+- Allow users to select a service date for each invoice row and carry that date consistently through draft restoration, preview, and issued PDF.
 
 ### Technical and integration scope
 
-- ✅ Reuse the current draft model, issue-validation rules, settings, and Electron IPC boundary.
+- ✅ Extend the current draft and issued-invoice models as needed while reusing issue-validation rules, settings, and the Electron IPC boundary.
 - ✅ Keep main-process issuance validation authoritative.
 - ✅ Keep display scaling and the sticky action presentation out of print rendering.
-- ✅ Preserve the existing CSV format and issued-invoice/archive data.
+- ✅ Preserve the existing CSV format and maintain compatibility with existing draft and issued-invoice/archive data when adding service dates.
 
 ### Out of scope
 
 - ❌ Changes to invoice numbering format, invoice-number uniqueness rules, or when a number is committed.
-- ❌ Changes to invoice totals, QR-bill generation, PDF contents, archive behavior, or issued-invoice correction policy.
+- ❌ Changes to invoice totals, QR-bill generation, unrelated PDF contents, archive behavior, or issued-invoice correction policy.
 - ❌ New CSV formats, customer-data migrations, or alternate customer storage.
 - ❌ A freeform preview zoom control or a redesigned invoice template.
 - ❌ New authentication, cloud storage, email delivery, or third-party service integration.
@@ -69,13 +70,14 @@ Help a small-business user complete and review an invoice confidently before the
 ## 5. User Stories
 
 1. **As a user preparing an invoice,** I want the proposed number to appear in the editable number field, **so that** I can issue it as proposed or enter another number. For example, the field shows `RE-2026-001` and Revert restores that exact current proposal.
-2. **As a user with an open draft,** I want numbering-setting changes to update the displayed proposal and number field, **so that** I do not issue a stale number. A prefix change from `RE-` to `INV-` updates the draft proposal and preview to the new configured value.
-3. **As a user on a small screen,** I want the preview page to fit the available preview width, **so that** I can review it without horizontal scrolling.
-4. **As a user editing a long invoice,** I want Issue invoice to stay available near the editor, **so that** I can complete the workflow without searching for the action.
-5. **As a user preparing an incomplete invoice,** I want blank fields to remain visually calm until I attempt issuance, **so that** I can enter information without error messages shifting the layout.
-6. **As a user whose issue attempt fails,** I want invalid fields highlighted with clear associated messages and focus moved to the first problem, **so that** I can fix the invoice efficiently.
-7. **As a user who attempts to issue an invoice with no service rows,** I want a blank row created with relevant errors, **so that** I have a direct place to complete the invoice.
-8. **As a user managing customers,** I want CSV selection and creation in one Customers area, **so that** I know where to manage the customer source.
+2. **As a user adding or editing an invoice row,** I want to select its service date, **so that** each row can show when that work took place.
+3. **As a user with an open draft,** I want numbering-setting changes to update the displayed proposal and number field, **so that** I do not issue a stale number. A prefix change from `RE-` to `INV-` updates the draft proposal and preview to the new configured value.
+4. **As a user on a small screen,** I want the preview page to fit the available preview width, **so that** I can review it without horizontal scrolling.
+5. **As a user editing a long invoice,** I want Issue invoice to stay available near the editor, **so that** I can complete the workflow without searching for the action.
+6. **As a user preparing an incomplete invoice,** I want blank fields to remain visually calm until I attempt issuance, **so that** I can enter information without error messages shifting the layout.
+7. **As a user whose issue attempt fails,** I want invalid fields highlighted with clear associated messages and focus moved to the first problem, **so that** I can fix the invoice efficiently.
+8. **As a user who attempts to issue an invoice with no service rows,** I want a blank row created with relevant errors, **so that** I have a direct place to complete the invoice.
+9. **As a user managing customers,** I want CSV selection and creation in one Customers area, **so that** I know where to manage the customer source.
 
 ## 6. Core Architecture and Patterns
 
@@ -95,7 +97,8 @@ Help a small-business user complete and review an invoice confidently before the
 - Track whether an issue attempt has occurred. Only then display issue validation; continue to run full validation in the main process before issuance.
 - Keep field-level error text associated through the existing accessible input relationships. Put service-row messages in a row-wide region so they do not collapse into narrow table columns.
 - Keep the persistent action visually and behaviorally associated with the editor. It must not cover the preview, inputs, or keyboard focus.
-- Do not add generic IPC, renderer filesystem access, or new persistence fields for these presentation changes.
+- Do not add generic IPC or renderer filesystem access. Persist service dates through the existing draft and issued-invoice flows, with backward-compatible defaults.
+- Store each service row's date on that row, so editing or changing the invoice date does not silently replace the chosen service dates. Preserve the existing date-only representation and make old drafts behave as they do today by treating a missing row date as the draft invoice date.
 
 ## 7. Feature Specifications
 
@@ -142,6 +145,16 @@ Help a small-business user complete and review an invoice confidently before the
 - Settings may show the currently selected customer CSV path as read-only. Archive-folder selection remains in Settings.
 - Do not change the customer CSV service, format, delimiter handling, or external-edit conflict behavior.
 
+### 7.6 Service date selection for invoice rows
+
+- Restore a date picker for each service row so a user can select or edit the date associated with that work.
+- Use the row's selected service date in the editor and the existing Date column in the invoice preview and issued PDF.
+- Keep service dates independent from invoice date and due date. Changing the invoice date must not overwrite explicitly selected row dates.
+- New rows should use the default behavior from the last version where row-date selection worked. If that behavior cannot be recovered, initialize the row date from the current invoice date.
+- Persist row dates in the existing draft and issued-invoice flows. Existing saved drafts and archived records without row dates must remain readable and render using the current invoice-date behavior.
+- Validate row dates as ISO date-only values at existing issue boundaries, associate validation with the row's date control, and retain main-process validation before issuance side effects.
+- Keep row dates keyboard accessible and preserve preview-to-editor focus mapping for each row.
+
 ## 8. Technology Stack
 
 Use the repository’s existing stack; this change should not require new runtime dependencies.
@@ -187,7 +200,7 @@ The renderer-to-issue boundary continues to carry the selected invoice number wi
 - ✅ An issue attempt with no rows creates one blank row and shows useful feedback without issuing or advancing the number.
 - ✅ Main-process validation still prevents invalid or duplicate issuance and does not advance numbering on failure.
 - ✅ Customer CSV selection, creation, and initialization are available in Customers and not in Settings.
-- ✅ Existing CSV data, invoice drafts, issued snapshots, and PDFs remain readable and unchanged.
+- ✅ Existing CSV data, invoice drafts, issued snapshots, and archived PDFs remain readable and unchanged.
 
 ### Quality indicators
 
@@ -244,7 +257,20 @@ The renderer-to-issue boundary continues to carry the selected invoice number wi
 **Validation:** Existing CSV integration tests, typecheck, lint, format check, unit/integration tests, build, smoke run, and manual Electron checks pass.  
 **Estimate:** 0.5–1 engineering day.
 
-**Overall estimate:** Approximately 3–6 engineering days, excluding cross-platform release validation.
+### Phase 5: Restore service dates on invoice rows
+
+**Goal:** Let users select a date for each service row and preserve it throughout the draft, preview, and issued invoice.
+
+- Inspect repository history or another available prior version to recover the working row-date behavior, including the default used when adding a row.
+- Add a date-only value to each service row and a date input in the row editor. If no prior default can be recovered, default a new row to the current invoice date.
+- Render and issue each row with its own date; changing invoice or due dates must not overwrite selected service dates.
+- Keep older drafts and issued archives compatible by falling back to the invoice date when a row has no stored date.
+- Add validation, persistence, migration/backward-compatibility, preview/PDF, and preview-to-editor focus coverage.
+
+**Validation:** Verify date selection on new and existing rows, row addition and duplication, draft save/reload, legacy records without row dates, invalid date feedback, invoice-date edits, preview focus, and exact date parity between preview and issued PDF. Run typecheck, lint, format check, all tests, build, and smoke checks.
+**Estimate:** 1–2 engineering days, subject to confirming prior behavior and archive compatibility.
+
+**Overall estimate:** Approximately 4–8 engineering days, excluding cross-platform release validation.
 
 ## 13. Future Considerations
 
