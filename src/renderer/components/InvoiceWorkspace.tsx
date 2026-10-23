@@ -1,6 +1,6 @@
 import type { InvoiceDraft } from '../../shared/domain/invoice';
 import type { Customer } from '../../shared/domain/customer';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { assignMeasuredPages } from '../invoice/assignMeasuredPages';
 import { resolvePageLines } from '../invoice/resolvePageLines';
 import { QrBillPreview } from './QrBillPreview';
@@ -69,18 +69,33 @@ function InvoiceWorkspaceContent({
   const pageLines = resolvePageLines(pageLineIds, draft.lines);
   const [oversizedLineIds, setOversizedLineIds] = useState<string[]>([]);
   const [footerTooTall, setFooterTooTall] = useState(false);
+  const [attemptedDraftId, setAttemptedDraftId] = useState<string | null>(null);
+  const [focusAttempt, setFocusAttempt] = useState(0);
+  const focusedAttempt = useRef(0);
+  const focusInsertedRow = useRef(false);
+  const issueAttempted = attemptedDraftId === draft.id;
   const proposal = settings
     ? createInvoiceNumberProposal(settings)
     : draft.suggestedNumber;
-  const currentIssues = printOnly ? [] : validateIssueDraft(draft).issues;
+  const currentIssues =
+    printOnly || !issueAttempted ? [] : validateIssueDraft(draft).issues;
   const liveIssues = [
     ...currentIssues,
-    ...issueIssues.filter((serverIssue) =>
-      currentIssues.some(
-        (currentIssue) => currentIssue.field === serverIssue.field,
-      ),
+    ...issueIssues.filter(
+      (serverIssue) =>
+        currentIssues.some(
+          (currentIssue) => currentIssue.field === serverIssue.field,
+        ) &&
+        !currentIssues.some(
+          (currentIssue) =>
+            currentIssue.field === serverIssue.field &&
+            currentIssue.message === serverIssue.message,
+        ),
     ),
   ];
+  const summaryIssues = liveIssues.filter(
+    (item) => !item.field.startsWith('lines.') && item.field !== 'lines',
+  );
   const issueFor = (field: string) =>
     liveIssues.find((item) => item.field === field)?.message;
   const lineIssue = (lineId: string, field: string) => {
@@ -91,12 +106,37 @@ function InvoiceWorkspaceContent({
     );
   };
   useLayoutEffect(() => {
-    if (issueIssues.length === 0) return;
-    const first = issueIssues[0]?.field;
-    const lineMatch = first?.match(/^lines\.(\d+)(?:\.(description))?$/);
+    if (
+      !issueAttempted ||
+      focusAttempt === 0 ||
+      focusedAttempt.current === focusAttempt
+    )
+      return;
+    if (focusInsertedRow.current) {
+      if (draft.lines.length === 0) return;
+      focusedAttempt.current = focusAttempt;
+      focusInsertedRow.current = false;
+      const insertedLine = draft.lines.at(-1);
+      if (insertedLine)
+        document.getElementById(`line-${insertedLine.id}-description`)?.focus();
+      return;
+    }
+    focusedAttempt.current = focusAttempt;
+    const first = currentIssues.find(
+      (item) =>
+        item.field === 'customer' ||
+        item.field.startsWith('customer.') ||
+        item.field === 'invoiceDate' ||
+        item.field === 'dueDate' ||
+        item.field === 'invoiceNumber' ||
+        item.field.startsWith('lines.'),
+    )?.field;
+    const lineMatch = first?.match(
+      /^lines\.(\d+)(?:\.(description|hours|rate))?$/,
+    );
     const id = lineMatch
       ? `line-${draft.lines[Number(lineMatch[1])]?.id ?? ''}-${lineMatch[2] ?? 'hours'}`
-      : first === 'customer'
+      : first === 'customer' || first?.startsWith('customer.')
         ? 'invoice-customer'
         : first === 'invoiceDate'
           ? 'invoice-date'
@@ -106,7 +146,7 @@ function InvoiceWorkspaceContent({
               ? 'invoice-number'
               : null;
     if (id) document.getElementById(id)?.focus();
-  }, [issueIssues, draft.lines]);
+  }, [currentIssues, draft.lines, focusAttempt, issueAttempted]);
   const contentKey = useMemo(
     () =>
       JSON.stringify([
@@ -210,17 +250,26 @@ function InvoiceWorkspaceContent({
       <section className="panel invoice-editor">
         <h2>Invoice draft</h2>
         {issueMessage && <p role="status">{issueMessage}</p>}
-        {liveIssues
-          .filter((item) => item.field === 'lines' || item.field === 'total')
-          .map((item) => (
-            <p
-              className="field-error"
-              role="alert"
-              key={`${item.field}-${item.message}`}
-            >
-              {item.message}
-            </p>
-          ))}
+        {summaryIssues.length > 0 && (
+          <div className="issue-summary" role="alert">
+            <strong>
+              {summaryIssues.length} issue
+              {summaryIssues.length === 1 ? '' : 's'} need attention before
+              issuing.
+            </strong>
+            <ul>
+              {summaryIssues.map((item, index) => (
+                <li key={`${item.field}-${item.message}-${index}`}>
+                  {item.field.startsWith('lines.') || item.field === 'lines'
+                    ? `Services: ${item.message}`
+                    : item.field === 'total'
+                      ? `Invoice total (check service hours and rates): ${item.message}`
+                      : `${item.field.startsWith('sender.') ? 'Company details' : item.field === 'customer' || item.field.startsWith('customer.') ? 'Customer' : item.field === 'invoiceDate' ? 'Invoice date' : item.field === 'dueDate' ? 'Due date' : item.field === 'invoiceNumber' ? 'Invoice number' : item.field}: ${item.message}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {liveIssues.some((item) => item.field.startsWith('sender.')) && (
           <p className="field-error">
             Company details need attention.{' '}
@@ -243,8 +292,16 @@ function InvoiceWorkspaceContent({
                   window.confirm(
                     'Issue this invoice now? The issued PDF and snapshot are permanent.',
                   )
-                )
-                  onIssue();
+                ) {
+                  setAttemptedDraftId(draft.id);
+                  setFocusAttempt((attempt) => attempt + 1);
+                  if (draft.lines.length === 0) {
+                    focusInsertedRow.current = true;
+                    onAddLine();
+                    return;
+                  }
+                  if (validateIssueDraft(draft).valid) onIssue();
+                }
               }}
             >
               {issuing ? 'Issuing…' : 'Issue invoice'}
@@ -412,123 +469,125 @@ function InvoiceWorkspaceContent({
               {draft.lines.map((line) => {
                 const amount = calculateLineAmount(line.hours, line.rate);
                 return (
-                  <tr key={line.id}>
-                    <td className="service-description-cell">
-                      <input
-                        id={`line-${line.id}-description`}
-                        aria-invalid={Boolean(
-                          lineIssue(line.id, 'description'),
+                  <Fragment key={line.id}>
+                    <tr>
+                      <td className="service-description-cell">
+                        <input
+                          id={`line-${line.id}-description`}
+                          aria-invalid={Boolean(
+                            lineIssue(line.id, 'description'),
+                          )}
+                          aria-describedby={
+                            lineIssue(line.id, 'description')
+                              ? `line-${line.id}-description-error`
+                              : undefined
+                          }
+                          aria-label="Service description"
+                          value={line.description}
+                          onChange={(event) =>
+                            onChange({
+                              lines: draft.lines.map((item) =>
+                                item.id === line.id
+                                  ? { ...item, description: event.target.value }
+                                  : item,
+                              ),
+                            })
+                          }
+                        />
+                        {lineIssue(line.id, 'description') && (
+                          <span
+                            id={`line-${line.id}-description-error`}
+                            className="visually-hidden"
+                          >
+                            {lineIssue(line.id, 'description')}
+                          </span>
                         )}
-                        aria-describedby={
-                          lineIssue(line.id, 'description')
-                            ? `line-${line.id}-description-error`
-                            : undefined
-                        }
-                        aria-label="Service description"
-                        value={line.description}
-                        onChange={(event) =>
-                          onChange({
-                            lines: draft.lines.map((item) =>
-                              item.id === line.id
-                                ? { ...item, description: event.target.value }
-                                : item,
-                            ),
-                          })
-                        }
-                      />
-                      {lineIssue(line.id, 'description') && (
-                        <span
-                          id={`line-${line.id}-description-error`}
-                          className="field-error"
+                      </td>
+                      <td className="service-numeric-cell">
+                        <input
+                          id={`line-${line.id}-hours`}
+                          aria-invalid={Boolean(lineIssue(line.id, 'hours'))}
+                          aria-describedby={
+                            lineIssue(line.id, 'hours')
+                              ? `line-${line.id}-hours-error`
+                              : undefined
+                          }
+                          aria-label="Hours"
+                          inputMode="decimal"
+                          value={line.hours}
+                          onChange={(event) =>
+                            onChange({
+                              lines: draft.lines.map((item) =>
+                                item.id === line.id
+                                  ? { ...item, hours: event.target.value }
+                                  : item,
+                              ),
+                            })
+                          }
+                        />
+                        {lineIssue(line.id, 'hours') && (
+                          <span
+                            id={`line-${line.id}-hours-error`}
+                            className="visually-hidden"
+                          >
+                            {lineIssue(line.id, 'hours')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="service-numeric-cell">
+                        <input
+                          id={`line-${line.id}-rate`}
+                          aria-invalid={Boolean(lineIssue(line.id, 'rate'))}
+                          aria-describedby={
+                            lineIssue(line.id, 'rate')
+                              ? `line-${line.id}-rate-error`
+                              : undefined
+                          }
+                          aria-label="Rate"
+                          inputMode="decimal"
+                          value={line.rate}
+                          onChange={(event) =>
+                            onChange({
+                              lines: draft.lines.map((item) =>
+                                item.id === line.id
+                                  ? { ...item, rate: event.target.value }
+                                  : item,
+                              ),
+                            })
+                          }
+                        />
+                        {lineIssue(line.id, 'rate') && (
+                          <span
+                            id={`line-${line.id}-rate-error`}
+                            className="visually-hidden"
+                          >
+                            {lineIssue(line.id, 'rate')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="service-amount-cell">
+                        {amount.valid
+                          ? formatCurrency(amount.amount, draft.currency)
+                          : '—'}
+                      </td>
+                      <td className="service-action-cell">
+                        <button
+                          type="button"
+                          className="danger service-remove-button"
+                          aria-label="Remove service row"
+                          onClick={() =>
+                            onChange({
+                              lines: draft.lines.filter(
+                                (item) => item.id !== line.id,
+                              ),
+                            })
+                          }
                         >
-                          {lineIssue(line.id, 'description')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="service-numeric-cell">
-                      <input
-                        id={`line-${line.id}-hours`}
-                        aria-invalid={Boolean(lineIssue(line.id, 'hours'))}
-                        aria-describedby={
-                          lineIssue(line.id, 'hours')
-                            ? `line-${line.id}-hours-error`
-                            : undefined
-                        }
-                        aria-label="Hours"
-                        inputMode="decimal"
-                        value={line.hours}
-                        onChange={(event) =>
-                          onChange({
-                            lines: draft.lines.map((item) =>
-                              item.id === line.id
-                                ? { ...item, hours: event.target.value }
-                                : item,
-                            ),
-                          })
-                        }
-                      />
-                      {lineIssue(line.id, 'hours') && (
-                        <span
-                          id={`line-${line.id}-hours-error`}
-                          className="field-error"
-                        >
-                          {lineIssue(line.id, 'hours')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="service-numeric-cell">
-                      <input
-                        id={`line-${line.id}-rate`}
-                        aria-invalid={Boolean(lineIssue(line.id, 'rate'))}
-                        aria-describedby={
-                          lineIssue(line.id, 'rate')
-                            ? `line-${line.id}-rate-error`
-                            : undefined
-                        }
-                        aria-label="Rate"
-                        inputMode="decimal"
-                        value={line.rate}
-                        onChange={(event) =>
-                          onChange({
-                            lines: draft.lines.map((item) =>
-                              item.id === line.id
-                                ? { ...item, rate: event.target.value }
-                                : item,
-                            ),
-                          })
-                        }
-                      />
-                      {lineIssue(line.id, 'rate') && (
-                        <span
-                          id={`line-${line.id}-rate-error`}
-                          className="field-error"
-                        >
-                          {lineIssue(line.id, 'rate')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="service-amount-cell">
-                      {amount.valid
-                        ? formatCurrency(amount.amount, draft.currency)
-                        : '—'}
-                    </td>
-                    <td className="service-action-cell">
-                      <button
-                        type="button"
-                        className="danger service-remove-button"
-                        aria-label="Remove service row"
-                        onClick={() =>
-                          onChange({
-                            lines: draft.lines.filter(
-                              (item) => item.id !== line.id,
-                            ),
-                          })
-                        }
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  </Fragment>
                 );
               })}
             </tbody>

@@ -64,6 +64,44 @@ describe('validateIssueDraft', () => {
       expect.arrayContaining(['sender.iban', 'customer', 'lines']),
     );
   });
+  it('reports empty and partial service rows without accepting the draft', () => {
+    const empty = validateIssueDraft({ ...draft, lines: [] });
+    expect(empty.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'lines' }),
+        expect.objectContaining({ field: 'total' }),
+      ]),
+    );
+    const partial = validateIssueDraft({
+      ...draft,
+      lines: [{ ...draft.lines[0]!, description: '', hours: '', rate: 'bad' }],
+    });
+    expect(partial.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'lines.0.description' }),
+        expect.objectContaining({ field: 'lines.0' }),
+        expect.objectContaining({ field: 'lines' }),
+      ]),
+    );
+  });
+  it('reports malformed dates and invalid customer and sender details', () => {
+    const result = validateIssueDraft({
+      ...draft,
+      invoiceDate: 'not-a-date',
+      dueDate: '',
+      customer: null,
+      sender: { ...draft.sender, name: '', iban: '' },
+    });
+    expect(result.issues.map((item) => item.field)).toEqual(
+      expect.arrayContaining([
+        'invoiceDate',
+        'dueDate',
+        'customer',
+        'sender.name',
+        'sender.iban',
+      ]),
+    );
+  });
   it('rejects zero total and unsafe invoice numbers', () => {
     expect(
       validateIssueDraft({
@@ -77,6 +115,16 @@ describe('validateIssueDraft', () => {
       expect.arrayContaining([
         expect.objectContaining({ field: 'invoiceNumber' }),
       ]),
+    );
+  });
+  it('rejects non-positive totals and malformed invoice numbers', () => {
+    const result = validateIssueDraft({
+      ...draft,
+      lines: [{ ...draft.lines[0]!, rate: '-1' }],
+      suggestedNumber: '<bad>',
+    });
+    expect(result.issues.map((item) => item.field)).toEqual(
+      expect.arrayContaining(['lines.0', 'lines', 'invoiceNumber']),
     );
   });
   it('rejects QR-bill amounts above the SIX maximum and oversized address fields', () => {

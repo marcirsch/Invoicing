@@ -142,6 +142,21 @@ main {
   font-size: 0.82rem;
   font-weight: 500;
 }
+.issue-summary {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--danger);
+  border-radius: 7px;
+  background: var(--danger-surface);
+  color: var(--text);
+}
+.issue-summary ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.25rem;
+}
+.issue-summary li + li {
+  margin-top: 0.2rem;
+}
 .invoice-number-proposal {
   display: flex;
   align-items: baseline;
