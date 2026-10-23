@@ -403,12 +403,15 @@ td {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
-  margin: 1rem -1rem -1rem;
-  padding: 0.85rem 1rem;
-  border-top: 1px solid var(--border);
+  min-height: 6rem;
+  margin: 1.25rem 0 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   background: var(--surface);
-  box-shadow: 0 -5px 14px rgb(15 25 40 / 8%);
+  box-shadow: 0 5px 16px rgb(15 25 40 / 10%);
 }
 .issue-action-context {
   display: grid;
