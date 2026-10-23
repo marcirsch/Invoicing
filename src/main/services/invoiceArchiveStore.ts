@@ -1,10 +1,25 @@
 import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { z } from 'zod';
 import type {
   InvoiceArchiveEntry,
   IssuedInvoice,
 } from '../../shared/domain/issuedInvoice';
-import { persistedInvoiceArchiveSchema } from '../../shared/validation/issuedInvoiceValidation';
+import {
+  issuedInvoiceSchema,
+  persistedInvoiceArchiveSchema,
+} from '../../shared/validation/issuedInvoiceValidation';
+
+const issueJournalSchema = z.object({
+  version: z.literal(1),
+  state: z.enum(['prepared', 'pdf-written', 'record-committed']),
+  record: issuedInvoiceSchema,
+  pdfSha256: z
+    .string()
+    .regex(/^[a-f\d]{64}$/i)
+    .optional(),
+});
 
 export class InvoiceArchiveStore {
   private tail: Promise<unknown> = Promise.resolve();
@@ -73,10 +88,11 @@ export class InvoiceArchiveStore {
         throw new Error(
           'An archived PDF with that filename already exists. Choose another invoice number.',
         );
+      const pdfSha256 = createHash('sha256').update(pdfBytes).digest('hex');
       await fs
         .writeFile(
           this.journalPath,
-          JSON.stringify({ version: 1, state: 'prepared', record }),
+          JSON.stringify({ version: 1, state: 'prepared', record, pdfSha256 }),
           { flag: 'wx' },
         )
         .catch(async (error: NodeJS.ErrnoException) => {
@@ -94,7 +110,12 @@ export class InvoiceArchiveStore {
         await handle.close();
         await fs.writeFile(
           this.journalPath,
-          JSON.stringify({ version: 1, state: 'pdf-written', record }),
+          JSON.stringify({
+            version: 1,
+            state: 'pdf-written',
+            record,
+            pdfSha256,
+          }),
         );
         await fs.copyFile(temporaryPdf, record.pdfPath, 1);
         await fs.rm(temporaryPdf, { force: true });
@@ -118,7 +139,12 @@ export class InvoiceArchiveStore {
         await fs.rename(tempIndex, this.indexPath);
         await fs.writeFile(
           this.journalPath,
-          JSON.stringify({ version: 1, state: 'record-committed', record }),
+          JSON.stringify({
+            version: 1,
+            state: 'record-committed',
+            record,
+            pdfSha256,
+          }),
         );
         await fs.rm(this.journalPath, { force: true });
       } catch (error) {
@@ -142,20 +168,20 @@ export class InvoiceArchiveStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
       throw new Error('Invoice recovery information is unreadable.');
     }
-    const journal = raw as { state?: string; record?: IssuedInvoice };
-    if (
-      !journal.record ||
-      !['prepared', 'pdf-written', 'record-committed'].includes(
-        journal.state ?? '',
-      )
-    )
+    const parsedJournal = issueJournalSchema.safeParse(raw);
+    if (!parsedJournal.success)
       throw new Error('Invoice recovery information is invalid.');
+    const journal = parsedJournal.data;
     const record = journal.record;
     const records = await this.readRecords();
     if (records.some((item) => item.id === record.id)) {
       await fs.rm(this.journalPath, { force: true });
       return;
     }
+    if (records.some((item) => item.invoiceNumber === record.invoiceNumber))
+      throw new Error(
+        'Invoice recovery conflicts with an existing invoice number and was preserved.',
+      );
     const temp = path.join(path.dirname(record.pdfPath), `.${record.id}.tmp`);
     const tempExists = await fs
       .access(temp)
@@ -165,16 +191,54 @@ export class InvoiceArchiveStore {
       .access(record.pdfPath)
       .then(() => true)
       .catch(() => false);
-    if (journal.state === 'prepared' && !finalExists) {
+    if (journal.state === 'prepared') {
+      if (finalExists)
+        throw new Error(
+          'Invoice recovery found a conflicting PDF and preserved it for review.',
+        );
       await fs.rm(temp, { force: true });
       await fs.rm(this.journalPath, { force: true });
       return;
     }
-    if (!finalExists && tempExists) await fs.copyFile(temp, record.pdfPath, 1);
-    else if (!finalExists)
+    if (!finalExists && !tempExists)
       throw new Error(
         'An incomplete invoice issue is preserved and needs review.',
       );
+    if (tempExists && journal.pdfSha256) {
+      const tempHash = createHash('sha256')
+        .update(await fs.readFile(temp))
+        .digest('hex');
+      if (tempHash !== journal.pdfSha256)
+        throw new Error(
+          'Invoice recovery found an invalid temporary PDF and preserved it for review.',
+        );
+    }
+    if (finalExists) {
+      if (journal.pdfSha256) {
+        const finalHash = createHash('sha256')
+          .update(await fs.readFile(record.pdfPath))
+          .digest('hex');
+        if (finalHash !== journal.pdfSha256)
+          throw new Error(
+            'Invoice recovery found a conflicting PDF and preserved it for review.',
+          );
+      } else if (tempExists) {
+        const [tempBytes, finalBytes] = await Promise.all([
+          fs.readFile(temp),
+          fs.readFile(record.pdfPath),
+        ]);
+        if (!tempBytes.equals(finalBytes))
+          throw new Error(
+            'Invoice recovery found a conflicting PDF and preserved it for review.',
+          );
+      } else {
+        throw new Error(
+          'Legacy invoice recovery cannot verify the existing PDF and preserved it for review.',
+        );
+      }
+    } else if (tempExists) {
+      await fs.copyFile(temp, record.pdfPath, 1);
+    }
     const updated = persistedInvoiceArchiveSchema.parse({
       version: 1,
       invoices: [...records, record],

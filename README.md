@@ -6,7 +6,7 @@ The planned app will run on macOS and Windows. It will let users manage customer
 
 ## Current status
 
-Phase 1 and Phase 2 are implemented. Phase 3 issuance code is now present: issue-time validation, Chromium invoice printing through the preview component, SwissQRBill A4 payment-page generation, PDF assembly, journaled archive storage, and archive/replacement UI. Automated checks pass, but visual review of invoice PDFs, QR validator/scanner checks, failure/restart workflows, and Windows verification remain outstanding; do not treat Phase 3 or Phase 4 as release-complete yet.
+The invoice workflow and issuance code are implemented. Phase 4 release hardening is in progress: Electron Forge configuration, native-host packaging scripts, platform icons, packaged smoke tooling, and journal-recovery coverage are present. Native macOS DMG/ZIP creation and packaged startup/preload smoke passed on macOS 27.0.1 arm64 on 2026-10-23. Native Windows packaging, fresh-install workflow checks, visual PDF review, SIX QR validation/scanning, accessibility review, and the DMG maker's unresolved ICNS parser advisory remain outstanding. Per-row service dates are also still missing and remain a release-scope decision. Do not treat the app as release-ready.
 
 ## Planned technology
 
@@ -32,12 +32,12 @@ Phase 1 establishes the desktop foundation and local data workflow:
 
 The app provides one editable invoice draft with customer and company snapshots, date and currency controls, stable-ID service rows, a suggested number that does not advance settings, debounced local persistence, and a content-measured A4 preview. Draft dates use `YYYY-MM-DD`; automatic due dates use calendar-day arithmetic and manual overrides persist until reset. Both invoice templates share the preview markup. The live preview includes invoice pages and a final QR-bill page, with an incomplete-data checklist when the payment slip cannot yet be rendered. The editing-only QR-bill sheet is screen-only; PDF generation appends the issued QR-bill page.
 
-Issued snapshots are stored in versioned `issued-invoices.json` under Electron user data. Final PDFs are written to the configured archive folder using invoice-number filenames; an app-data transaction journal supports recovery on first archive or issue access. Archive metadata remains available if the selected folder is moved, with the PDF marked unavailable. The service never replaces an existing PDF. SIX guidelines v2.3 are effective on 2026-10-07; v2.4 is scheduled for 2026-11-13, so standards and validator checks must be repeated before release. Draft data remains separate in `invoice-draft.json`; malformed saved data is preserved and reported.
+Issued snapshots are stored in versioned `issued-invoices.json` under Electron user data. Final PDFs are written to the configured archive folder using invoice-number filenames; an app-data transaction journal supports recovery on first archive or issue access. New journal entries include a PDF digest so recovery can reject conflicting output. Archive metadata remains available if the selected folder is moved, with the PDF marked unavailable. The service never replaces an existing PDF. As of 2026-10-23, SIX QR-bill guideline v2.3 is in force; v2.4 is scheduled to take effect on 2026-11-14. Recheck the effective version and validate QR output before release. Draft data remains separate in `invoice-draft.json`; malformed saved data is preserved and reported.
 
 ## Documentation
 
-- [Product requirements](.codex/PRD.md)
 - [Repository guidance](.agents/AGENTS.md)
+- [Release validation record](docs/release-validation.md)
 - [Customer CSV guidance](.agents/reference/csv-data.md)
 - [Electron guidance](.agents/reference/electron.md)
 - [Invoice domain guidance](.agents/reference/invoice-domain.md)
@@ -129,7 +129,7 @@ npm run build
 npm run smoke
 ```
 
-`npm run build` compiles the main process, preload script, and renderer into the generated `out` directory. `npm run smoke` builds the app, launches that production output, and verifies the renderer and preload bridge initialize. It does not create an installer yet. A successful result ends with:
+`npm run build` compiles the main process, preload script, and renderer into the generated `out` directory. `npm run smoke` builds the app, launches that production output, and verifies the renderer and preload bridge initialize. It does not create an installer. A successful result ends with:
 
 ```text
 Smoke test passed: Electron loaded the renderer and preload bridge.
@@ -137,7 +137,27 @@ Smoke test passed: Electron loaded the renderer and preload bridge.
 
 If this command fails, copy the complete terminal output when reporting the problem. It identifies whether dependency installation, compilation, Electron startup, or preload initialization failed.
 
-### 7. Typical day-to-day workflow
+### 7. Build native review artifacts
+
+Build on the target operating system. Forge makers require native macOS for DMG output and native Windows for the Windows installer; the commands use the host architecture.
+
+```bash
+npm run make:mac
+npm run smoke:packaged
+```
+
+On Windows, run:
+
+```powershell
+npm run make:win
+npm run smoke:packaged
+```
+
+Artifacts are written under `release/make/` so Forge output stays separate from Electron Vite's `out/` build directory. macOS produces a DMG and ZIP; Windows produces a Squirrel Setup executable, its package metadata, and a ZIP. The version/platform/architecture are in Forge's artifact names or output paths. `smoke:packaged` launches the packaged executable with a fresh temporary user-data directory, checks the renderer/preload handshake, then removes only that directory. These are review builds without trusted distribution signing or notarization, not public distribution packages. Record artifact names and SHA-256 values in the [release validation record](docs/release-validation.md).
+
+Do not run platform packaging from a different operating system as a substitute for native installer verification.
+
+### 8. Typical day-to-day workflow
 
 After the initial setup, the usual workflow is:
 

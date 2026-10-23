@@ -714,6 +714,9 @@ td {
     size: A4;
     margin: 0;
   }
+  .print-only.invoice-workspace {
+    display: block;
+  }
   .invoice-pages {
     display: block;
   }

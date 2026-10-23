@@ -1,4 +1,6 @@
 import { app, BrowserWindow, nativeTheme, session } from 'electron';
+import squirrelStartup from 'electron-squirrel-startup';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { registerHandlers } from './ipc/registerHandlers';
@@ -8,6 +10,19 @@ import { DraftStore } from './services/draftStore';
 import { InvoiceArchiveStore } from './services/invoiceArchiveStore';
 import { InvoiceIssuanceService } from './services/invoiceIssuanceService';
 import { renderInvoicePdf } from './services/invoicePdfService';
+
+const smokeTestMode = process.argv.includes('--smoke-test');
+const smokeUserDataPath = process.argv
+  .find((argument) => argument.startsWith('--smoke-user-data-path='))
+  ?.slice('--smoke-user-data-path='.length);
+const smokeResultPath = process.argv
+  .find((argument) => argument.startsWith('--smoke-result-path='))
+  ?.slice('--smoke-result-path='.length);
+
+if (squirrelStartup) app.quit();
+if (process.platform === 'win32')
+  app.setAppUserModelId('com.squirrel.LocalInvoicing.LocalInvoicing');
+
 function createWindow(): void {
   const rendererFile = pathToFileURL(
     path.join(__dirname, '../renderer/index.html'),
@@ -25,23 +40,25 @@ function createWindow(): void {
       nodeIntegration: false,
     },
   });
-  if (process.argv.includes('--smoke-test')) {
+  if (smokeTestMode) {
     win.webContents.once('did-finish-load', () => {
       void win.webContents
         .executeJavaScript(
           "Boolean(window.invoicing && typeof window.invoicing.getSettings === 'function' && typeof window.invoicing.loadCustomers === 'function')",
         )
         .then((bridgeAvailable: boolean) => {
-          console.log(
+          finishSmokeTest(
             bridgeAvailable
               ? 'SMOKE_TEST_OK'
               : 'SMOKE_TEST_FAIL: preload bridge missing',
+            bridgeAvailable,
           );
-          app.exit(bridgeAvailable ? 0 : 1);
         })
         .catch(() => {
-          console.error('SMOKE_TEST_FAIL: renderer did not initialize');
-          app.exit(1);
+          finishSmokeTest(
+            'SMOKE_TEST_FAIL: renderer did not initialize',
+            false,
+          );
         });
     });
   }
@@ -67,7 +84,9 @@ app.whenReady().then(() => {
       },
     }),
   );
-  const testUserDataPath = process.env.INVOICING_TEST_USER_DATA_PATH?.trim();
+  const testUserDataPath =
+    process.env.INVOICING_TEST_USER_DATA_PATH?.trim() ||
+    (smokeTestMode ? smokeUserDataPath : undefined);
   const userDataPath = testUserDataPath
     ? path.resolve(testUserDataPath)
     : app.getPath('userData');
@@ -96,3 +115,13 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+function finishSmokeTest(message: string, success: boolean): void {
+  if (smokeResultPath) {
+    void writeFile(smokeResultPath, message, 'utf8').then(() =>
+      app.exit(success ? 0 : 1),
+    );
+    return;
+  }
+  process.stdout.write(`${message}\n`, () => app.exit(success ? 0 : 1));
+}
