@@ -1,0 +1,4 @@
+interface:
+  display_name: "Application QA"
+  short_description: "Thoroughly test complete applications as a user"
+  default_prompt: "Use $application-qa to exercise the application end to end and report UI, behavior, and data-flow defects."
