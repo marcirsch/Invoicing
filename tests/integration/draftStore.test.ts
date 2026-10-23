@@ -46,5 +46,8 @@ describe('DraftStore', () => {
     };
     await store.save(draft);
     expect(await store.load()).toEqual(draft);
+    const editedDraft = { ...draft, suggestedNumber: 'CUSTOM-2025-42' };
+    await store.save(editedDraft);
+    expect(await store.load()).toEqual(editedDraft);
   });
 });

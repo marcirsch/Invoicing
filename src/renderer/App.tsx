@@ -13,6 +13,7 @@ import type { IssuedInvoice } from '../shared/domain/issuedInvoice';
 import { issuedInvoiceSchema } from '../shared/validation/issuedInvoiceValidation';
 import { InvoiceArchive } from './components/InvoiceArchive';
 import type { IssueIssue } from '../shared/invoice/issueValidation';
+import { createInvoiceNumberProposal } from '../shared/invoice/numbering';
 
 type Page = 'customers' | 'settings' | 'invoice' | 'archive';
 export default function App(): JSX.Element {
@@ -192,7 +193,7 @@ function MainApp(): JSX.Element {
     )
       await customerState.remove(customer.id);
   }
-  async function issueInvoice(numberOverride: string) {
+  async function issueInvoice() {
     if (!invoice.draft || issuing) return;
     setIssuing(true);
     setServerIssues([]);
@@ -200,7 +201,6 @@ function MainApp(): JSX.Element {
     transactionId.current ??= crypto.randomUUID();
     const result = await window.invoicing.issueInvoice({
       draft: invoice.draft,
-      numberOverride: numberOverride || undefined,
       transactionId: transactionId.current,
       replacesInvoiceId,
     });
@@ -243,7 +243,7 @@ function MainApp(): JSX.Element {
       currency: record.currency,
       invoiceDate: new Date().toISOString().slice(0, 10),
       dueDate: record.dueDate,
-      suggestedNumber: `${settings.settings.invoicePrefix}${settings.settings.invoiceYear}-${String(settings.settings.nextSequence).padStart(3, '0')}`,
+      suggestedNumber: createInvoiceNumberProposal(settings.settings),
       template: record.template,
       notes: record.notes,
       invoiceFooter: record.invoiceFooter,
@@ -299,11 +299,12 @@ function MainApp(): JSX.Element {
         <InvoiceWorkspace
           draft={invoice.draft}
           customers={customerState.customers}
+          settings={settings.settings}
           onChange={invoice.update}
           onAddLine={invoice.addLine}
           onResetDueDate={invoice.resetDueDate}
           error={invoice.error}
-          onIssue={(number) => void issueInvoice(number)}
+          onIssue={() => void issueInvoice()}
           issuing={issuing}
           issueMessage={issueMessage}
           issueIssues={serverIssues}

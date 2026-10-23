@@ -13,6 +13,8 @@ import {
   validateIssueDraft,
   type IssueIssue,
 } from '../../shared/invoice/issueValidation';
+import { createInvoiceNumberProposal } from '../../shared/invoice/numbering';
+import type { Settings } from '../../shared/domain/settings';
 
 interface InvoiceWorkspaceProps {
   draft: InvoiceDraft | null;
@@ -20,9 +22,10 @@ interface InvoiceWorkspaceProps {
   onChange(draft: Partial<InvoiceDraft>): void;
   onAddLine(): void;
   onResetDueDate(): void;
+  settings?: Pick<Settings, 'invoicePrefix' | 'invoiceYear' | 'nextSequence'>;
   error: string | null;
   printOnly?: boolean;
-  onIssue?: (numberOverride: string) => void;
+  onIssue?: () => void;
   issuing?: boolean;
   issueMessage?: string | null;
   issueIssues?: IssueIssue[];
@@ -46,6 +49,7 @@ function InvoiceWorkspaceContent({
   onChange,
   onAddLine,
   onResetDueDate,
+  settings,
   error,
   printOnly = false,
   onIssue,
@@ -65,11 +69,10 @@ function InvoiceWorkspaceContent({
   const pageLines = resolvePageLines(pageLineIds, draft.lines);
   const [oversizedLineIds, setOversizedLineIds] = useState<string[]>([]);
   const [footerTooTall, setFooterTooTall] = useState(false);
-  const [numberOverride, setNumberOverride] = useState('');
-  const currentIssues = printOnly
-    ? []
-    : validateIssueDraft(draft, numberOverride.trim() || draft.suggestedNumber)
-        .issues;
+  const proposal = settings
+    ? createInvoiceNumberProposal(settings)
+    : draft.suggestedNumber;
+  const currentIssues = printOnly ? [] : validateIssueDraft(draft).issues;
   const liveIssues = [
     ...currentIssues,
     ...issueIssues.filter((serverIssue) =>
@@ -87,7 +90,6 @@ function InvoiceWorkspaceContent({
       (field !== 'description' ? issueFor(`lines.${index}`) : undefined)
     );
   };
-  const displayedInvoiceNumber = numberOverride.trim() || draft.suggestedNumber;
   useLayoutEffect(() => {
     if (issueIssues.length === 0) return;
     const first = issueIssues[0]?.field;
@@ -101,11 +103,10 @@ function InvoiceWorkspaceContent({
           : first === 'dueDate'
             ? 'due-date'
             : first === 'invoiceNumber'
-              ? 'invoice-number-override'
+              ? 'invoice-number'
               : null;
     if (id) document.getElementById(id)?.focus();
   }, [issueIssues, draft.lines]);
-  useLayoutEffect(() => setNumberOverride(''), [draft.id]);
   const contentKey = useMemo(
     () =>
       JSON.stringify([
@@ -234,25 +235,6 @@ function InvoiceWorkspaceContent({
         )}
         {onIssue && (
           <div className="issue-controls">
-            <label className="field">
-              Invoice number override
-              <input
-                id="invoice-number-override"
-                value={numberOverride}
-                aria-invalid={Boolean(issueFor('invoiceNumber'))}
-                aria-describedby={
-                  issueFor('invoiceNumber') ? 'invoice-number-error' : undefined
-                }
-                maxLength={80}
-                onChange={(event) => setNumberOverride(event.target.value)}
-                placeholder={draft.suggestedNumber}
-              />
-              {issueFor('invoiceNumber') && (
-                <span id="invoice-number-error" className="field-error">
-                  {issueFor('invoiceNumber')}
-                </span>
-              )}
-            </label>
             <button
               type="button"
               disabled={issuing}
@@ -262,7 +244,7 @@ function InvoiceWorkspaceContent({
                     'Issue this invoice now? The issued PDF and snapshot are permanent.',
                   )
                 )
-                  onIssue(numberOverride);
+                  onIssue();
               }}
             >
               {issuing ? 'Issuing…' : 'Issue invoice'}
@@ -301,8 +283,32 @@ function InvoiceWorkspaceContent({
             )}
           </label>
           <label className="field">
-            Suggested invoice number
-            <input readOnly value={draft.suggestedNumber} />
+            Invoice number
+            <input
+              id="invoice-number"
+              value={draft.suggestedNumber}
+              aria-invalid={Boolean(issueFor('invoiceNumber'))}
+              aria-describedby={
+                issueFor('invoiceNumber') ? 'invoice-number-error' : undefined
+              }
+              maxLength={80}
+              onChange={(event) =>
+                onChange({ suggestedNumber: event.target.value })
+              }
+            />
+            {issueFor('invoiceNumber') && (
+              <span id="invoice-number-error" className="field-error">
+                {issueFor('invoiceNumber')}
+              </span>
+            )}
+            <button
+              type="button"
+              className="text-button"
+              disabled={draft.suggestedNumber === proposal}
+              onClick={() => onChange({ suggestedNumber: proposal })}
+            >
+              Revert to proposed number
+            </button>
           </label>
           <label className="field">
             Invoice date
@@ -676,11 +682,11 @@ function InvoiceWorkspaceContent({
                   </PreviewTarget>
                   <strong>Rechnungsnummer</strong>
                   <PreviewTarget
-                    fieldId="invoice-number-override"
+                    fieldId="invoice-number"
                     label="Invoice number"
                     printOnly={printOnly}
                   >
-                    <strong>{displayedInvoiceNumber}</strong>
+                    <strong>{draft.suggestedNumber}</strong>
                   </PreviewTarget>
                 </div>
               </section>
@@ -775,7 +781,7 @@ function InvoiceWorkspaceContent({
           </section>
         ))}
         {!printOnly && (
-          <QrBillPreview draft={draft} invoiceNumber={displayedInvoiceNumber} />
+          <QrBillPreview draft={draft} invoiceNumber={draft.suggestedNumber} />
         )}
       </div>
     </section>

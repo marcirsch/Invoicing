@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Customer } from '../../shared/domain/customer';
 import type {
   InvoiceDraft,
@@ -7,6 +7,7 @@ import type {
 import type { Settings } from '../../shared/domain/settings';
 import { addCalendarDays } from '../../shared/invoice/dates';
 import { isIsoDate } from '../../shared/invoice/dates';
+import { createInvoiceNumberProposal } from '../../shared/invoice/numbering';
 
 function createDraft(settings: Settings, customers: Customer[]): InvoiceDraft {
   const today = new Date();
@@ -22,7 +23,7 @@ function createDraft(settings: Settings, customers: Customer[]): InvoiceDraft {
         : 30,
     ),
     currency: settings.currency,
-    suggestedNumber: `${settings.invoicePrefix}${settings.invoiceYear}-${String(settings.nextSequence).padStart(3, '0')}`,
+    suggestedNumber: createInvoiceNumberProposal(settings),
     customerId: customer?.id ?? null,
     customer,
     sender: settings.company,
@@ -44,6 +45,7 @@ export function useInvoiceDraft(
   const [draft, setDraft] = useState<InvoiceDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const previousProposal = useRef<string | null>(null);
   useEffect(() => {
     if (!ready) return;
     let active = true;
@@ -57,6 +59,20 @@ export function useInvoiceDraft(
       active = false;
     };
   }, [ready]);
+  const proposal = createInvoiceNumberProposal(settings);
+  useEffect(() => {
+    if (!ready || loading || error || !draft) return;
+    const shouldReconcile =
+      previousProposal.current === null ||
+      previousProposal.current !== proposal;
+    previousProposal.current = proposal;
+    if (!shouldReconcile || draft.suggestedNumber === proposal) return;
+    setDraft((current) =>
+      current && current.suggestedNumber !== proposal
+        ? { ...current, suggestedNumber: proposal }
+        : current,
+    );
+  }, [ready, loading, error, draft, proposal]);
   useEffect(() => {
     if (!draft || loading || error) return;
     const timeout = window.setTimeout(() => {
