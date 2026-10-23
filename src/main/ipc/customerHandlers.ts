@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import { BrowserWindow } from 'electron';
 import type { CsvDelimiter } from '../../shared/csv/dialect';
 import { customerSchema } from '../../shared/validation/customerValidation';
 import type { CustomerCsvService } from '../services/customerCsvService';
 import type { SettingsStore } from '../services/settingsStore';
 import type { HandlerRegistrar } from './registerHandlers';
+import { createCsvPath } from '../services/fileDialogService';
 
 type CsvLoader = (path: string, delimiter?: CsvDelimiter) => Promise<unknown>;
 export function registerCustomerHandlers(
@@ -41,4 +43,21 @@ export function registerCustomerHandlers(
   register('customers:delete', async (_event, payload) =>
     customers.delete(z.string().min(1).parse(payload)),
   );
+  register('customers:create-csv', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) throw new Error('The application window is unavailable.');
+    const filePath = await createCsvPath(window);
+    if (!filePath) return null;
+    await customers.createEmptyFile(filePath);
+    await loadCsv(filePath);
+    return filePath;
+  });
+  register('customers:initialize-empty-csv', async () => {
+    const filePath = getPendingPath() ?? (await store.load()).csvPath;
+    if (!filePath)
+      throw new Error('Select an empty customer CSV before initializing it.');
+    await customers.initializeEmptyFile(filePath);
+    await loadCsv(filePath);
+    return filePath;
+  });
 }

@@ -23,6 +23,8 @@ export interface IpcApi {
     appearance: Settings['appearance'],
   ): Promise<Result<Settings['appearance']>>;
   selectCsv(): Promise<Result<string | null>>;
+  createCustomerCsv(): Promise<Result<string | null>>;
+  initializeEmptyCustomerCsv(): Promise<Result<string | null>>;
   selectArchiveFolder(): Promise<Result<string | null>>;
   selectInvoiceLogo(): Promise<Result<string | null>>;
   loadCustomers(delimiter?: CsvDelimiter): Promise<Result<Customer[]>>;

@@ -21,6 +21,12 @@ const fields = [
   'city',
   'country',
 ] as const;
+const defaultDialect = {
+  delimiter: ';',
+  lineEnding: '\r\n',
+  bom: false,
+  finalNewline: true,
+} as const;
 type Field = (typeof fields)[number];
 interface FileIdentity {
   dev: number;
@@ -40,6 +46,10 @@ export class CustomerCsvService {
     selectedDelimiter?: CsvDelimiter,
   ): Promise<Customer[]> {
     const bytes = await fs.readFile(filePath);
+    if (bytes.length === 0)
+      throw new Error(
+        'CSV file is empty. Initialize it with the standard customer columns or choose a different file.',
+      );
     const text = bytes.toString('utf8');
     if (!Buffer.from(text, 'utf8').equals(bytes))
       throw new Error(
@@ -90,6 +100,76 @@ export class CustomerCsvService {
     this.fingerprint = hash(bytes);
     this.identity = { dev: stat.dev, ino: stat.ino };
     return this.toCustomers();
+  }
+
+  async createEmptyFile(filePath: string): Promise<void> {
+    const content = serializeCsv({
+      headers: [...fields],
+      rows: [],
+      dialect: { ...defaultDialect },
+    });
+    let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+    try {
+      handle = await fs.open(filePath, 'wx');
+      await handle.writeFile(content, 'utf8');
+      await handle.sync();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+        throw new Error(
+          'A CSV file already exists at that location. Choose a different name; the existing file was left unchanged.',
+        );
+      if (handle) {
+        const opened = await handle.stat().catch(() => null);
+        const current = await fs.stat(filePath).catch(() => null);
+        if (
+          opened &&
+          current &&
+          opened.dev === current.dev &&
+          opened.ino === current.ino
+        )
+          await fs.unlink(filePath).catch(() => undefined);
+      }
+      throw error;
+    } finally {
+      await handle?.close().catch(() => undefined);
+    }
+  }
+
+  async initializeEmptyFile(filePath: string): Promise<void> {
+    const resolvedPath = path.resolve(filePath);
+    const bytes = await fs.readFile(resolvedPath);
+    if (bytes.length !== 0)
+      throw new Error(
+        'The selected CSV is no longer empty. It was left unchanged; reload or choose a different file.',
+      );
+    const stat = await fs.stat(resolvedPath);
+    const previous = {
+      document: this.document,
+      fingerprint: this.fingerprint,
+      identity: this.identity,
+      sourcePath: this.sourcePath,
+      selectedDelimiter: this.selectedDelimiter,
+    };
+    this.document = {
+      headers: [...fields],
+      rows: [],
+      dialect: { ...defaultDialect },
+    };
+    this.fingerprint = hash(bytes);
+    this.identity = { dev: stat.dev, ino: stat.ino };
+    this.sourcePath = resolvedPath;
+    this.selectedDelimiter = defaultDialect.delimiter;
+    try {
+      await this.assertUnchanged();
+      await this.writeRows([]);
+    } catch (error) {
+      this.document = previous.document;
+      this.fingerprint = previous.fingerprint;
+      this.identity = previous.identity;
+      this.sourcePath = previous.sourcePath;
+      this.selectedDelimiter = previous.selectedDelimiter;
+      throw error;
+    }
   }
 
   private columnIndexes(): Record<Field, number> {
@@ -218,6 +298,7 @@ export class CustomerCsvService {
         await fs.writeFile(backup, original, { mode });
       }
       await fs.writeFile(temp, output, { encoding: 'utf8', mode });
+      await this.assertUnchanged();
       if (process.platform === 'win32') {
         transientOriginal = `${target}.${crypto.randomUUID()}.old`;
         await fs.rename(target, transientOriginal);

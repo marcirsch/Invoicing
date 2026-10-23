@@ -1,5 +1,6 @@
 import { dialog, BrowserWindow } from 'electron';
 import { promises as fs } from 'node:fs';
+import path from 'node:path';
 export async function selectArchiveFolder(
   window: BrowserWindow,
 ): Promise<string | null> {
@@ -14,6 +15,20 @@ export async function selectCsv(window: BrowserWindow): Promise<string | null> {
     filters: [{ name: 'CSV', extensions: ['csv'] }],
   });
   return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+export async function createCsvPath(
+  window: BrowserWindow,
+): Promise<string | null> {
+  const result = await dialog.showSaveDialog(window, {
+    title: 'Create customer CSV',
+    buttonLabel: 'Create CSV',
+    defaultPath: 'customers.csv',
+    filters: [{ name: 'CSV', extensions: ['csv'] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  return path.extname(result.filePath).toLocaleLowerCase() === '.csv'
+    ? result.filePath
+    : `${result.filePath}.csv`;
 }
 export async function selectInvoiceLogo(
   window: BrowserWindow,

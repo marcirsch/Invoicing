@@ -23,6 +23,14 @@ const api: IpcApi = {
     >,
   selectCsv: () =>
     ipcRenderer.invoke('settings:select-csv') as Promise<Result<string | null>>,
+  createCustomerCsv: () =>
+    ipcRenderer.invoke('customers:create-csv') as Promise<
+      Result<string | null>
+    >,
+  initializeEmptyCustomerCsv: () =>
+    ipcRenderer.invoke('customers:initialize-empty-csv') as Promise<
+      Result<string | null>
+    >,
   selectArchiveFolder: () =>
     ipcRenderer.invoke('settings:select-archive') as Promise<
       Result<string | null>

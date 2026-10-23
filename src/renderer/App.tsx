@@ -100,6 +100,7 @@ function MainApp(): JSX.Element {
     const result = await window.invoicing.selectCsv();
     if (!result.ok) {
       customerState.setError(result.error.message);
+      customerState.setErrorCode(result.error.code);
       customerState.setDialectAmbiguous(
         result.error.code === 'dialect_ambiguous',
       );
@@ -125,6 +126,38 @@ function MainApp(): JSX.Element {
   }
   async function chooseDelimiter(delimiter: ',' | ';' | '\t') {
     await customerState.refresh(delimiter);
+  }
+  async function createCustomerCsv() {
+    const result = await window.invoicing.createCustomerCsv();
+    if (!result.ok) {
+      customerState.setError(result.error.message);
+      customerState.setErrorCode(result.error.code);
+      return;
+    }
+    if (!result.value) return;
+    customerState.setError(null);
+    customerState.setErrorCode(null);
+    settings.setSettings((current) => ({
+      ...current,
+      csvPath: result.value,
+    }));
+    await customerState.refresh();
+  }
+  async function initializeEmptyCustomerCsv() {
+    const result = await window.invoicing.initializeEmptyCustomerCsv();
+    if (!result.ok) {
+      customerState.setError(result.error.message);
+      customerState.setErrorCode(result.error.code);
+      return;
+    }
+    if (!result.value) return;
+    customerState.setError(null);
+    customerState.setErrorCode(null);
+    settings.setSettings((current) => ({
+      ...current,
+      csvPath: result.value,
+    }));
+    await customerState.refresh();
   }
   async function changeAppearance(appearance: 'system' | 'light' | 'dark') {
     const persisted = settings.settings.appearance;
@@ -226,7 +259,7 @@ function MainApp(): JSX.Element {
       appearance={settings.settings.appearance}
       onAppearanceChange={changeAppearance}
     >
-      {customerState.error && (
+      {customerState.error && customerState.errorCode !== 'csv_empty' && (
         <ErrorMessage
           message={customerState.error}
           onReload={
@@ -287,6 +320,9 @@ function MainApp(): JSX.Element {
           onChange={settings.setSettings}
           onSave={saveSettings}
           onSelectCsv={() => void chooseCsv()}
+          onCreateCsv={() => void createCustomerCsv()}
+          canInitializeEmptyCsv={customerState.errorCode === 'csv_empty'}
+          onInitializeEmptyCsv={() => void initializeEmptyCustomerCsv()}
           onSelectArchive={() => void chooseArchive()}
           onSelectLogo={() => void chooseLogo()}
         />
@@ -306,6 +342,9 @@ function MainApp(): JSX.Element {
           onEdit={setEditing}
           onDelete={(customer) => void deleteCustomer(customer)}
           onSelectCsv={() => void chooseCsv()}
+          onCreateCsv={() => void createCustomerCsv()}
+          canInitializeEmptyCsv={customerState.errorCode === 'csv_empty'}
+          onInitializeEmptyCsv={() => void initializeEmptyCustomerCsv()}
           onReload={() => void customerState.reload()}
         />
       )}

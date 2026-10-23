@@ -10,6 +10,9 @@ interface Props {
   onChange(settings: Settings): void;
   onSave(): Promise<boolean>;
   onSelectCsv(): void;
+  onCreateCsv(): void;
+  canInitializeEmptyCsv: boolean;
+  onInitializeEmptyCsv(): void;
   onSelectArchive(): void;
   onSelectLogo(): void;
 }
@@ -21,6 +24,9 @@ export function SettingsForm({
   onChange,
   onSave,
   onSelectCsv,
+  onCreateCsv,
+  canInitializeEmptyCsv,
+  onInitializeEmptyCsv,
   onSelectArchive,
   onSelectLogo,
 }: Props): JSX.Element {
@@ -271,6 +277,9 @@ export function SettingsForm({
           <button type="button" className="secondary" onClick={onSelectCsv}>
             Choose CSV…
           </button>
+          <button type="button" className="secondary" onClick={onCreateCsv}>
+            Create customer CSV…
+          </button>
         </div>
         <div className="path-setting">
           <span>Archive folder: {settings.archivePath ?? 'Not selected'}</span>
@@ -278,6 +287,16 @@ export function SettingsForm({
             Choose folder…
           </button>
         </div>
+        {canInitializeEmptyCsv && (
+          <div className="empty-state" role="status">
+            <p>
+              The selected customer CSV is empty and has not been initialized.
+            </p>
+            <button type="button" onClick={onInitializeEmptyCsv}>
+              Initialize empty CSV
+            </button>
+          </div>
+        )}
       </fieldset>
       <button type="submit" disabled={loading || saving}>
         {saving ? 'Saving…' : 'Save settings'}

@@ -70,6 +70,62 @@ describe('CustomerCsvService', () => {
     expect(saved).not.toContain('003;');
     expect(saved.startsWith(`${headers}\r\n`)).toBe(true);
   });
+  it('creates and reloads a standard header-only customer CSV before adding a customer', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'invoice-csv-'));
+    directories.push(directory);
+    const file = path.join(directory, 'new-customers.csv');
+    const service = new CustomerCsvService();
+    await service.createEmptyFile(file);
+    expect(await readFile(file, 'utf8')).toBe(
+      'id;name;email;phone;street;buildingNumber;postalCode;city;country\r\n',
+    );
+    expect(await service.load(file)).toEqual([]);
+    await service.save({ ...customer('new-id'), name: 'New customer' });
+    expect(service.customers()).toMatchObject([
+      { id: 'new-id', name: 'New customer' },
+    ]);
+  });
+  it('explicitly initializes only an empty CSV and backs up the original', async () => {
+    const file = await fixture('');
+    const service = new CustomerCsvService();
+    await service.initializeEmptyFile(file);
+    expect(await readFile(file, 'utf8')).toBe(
+      'id;name;email;phone;street;buildingNumber;postalCode;city;country\r\n',
+    );
+    expect(await readFile(`${file}.phase1-backup`, 'utf8')).toBe('');
+    expect(await service.load(file)).toEqual([]);
+  });
+  it('leaves an external write intact if the empty file changes during initialization', async () => {
+    const file = await fixture('');
+    const service = new CustomerCsvService();
+    const originalWriteFile = fs.writeFile.bind(fs);
+    vi.spyOn(fs, 'writeFile').mockImplementation(
+      async (target, data, options) => {
+        if (String(target).endsWith('.phase1-backup'))
+          await originalWriteFile(file, 'external content');
+        return originalWriteFile(target, data, options);
+      },
+    );
+    await expect(service.initializeEmptyFile(file)).rejects.toThrow(
+      /changed outside the app/,
+    );
+    expect(await readFile(file, 'utf8')).toBe('external content');
+  });
+  it('refuses to overwrite an existing file or initialize a file that is no longer empty', async () => {
+    const file = await fixture(original);
+    const service = new CustomerCsvService();
+    await expect(service.createEmptyFile(file)).rejects.toThrow(
+      /already exists.*left unchanged/,
+    );
+    expect(await readFile(file, 'utf8')).toBe(original);
+
+    const empty = await fixture('');
+    await writeFile(empty, 'external content');
+    await expect(service.initializeEmptyFile(empty)).rejects.toThrow(
+      /no longer empty.*left unchanged/,
+    );
+    expect(await readFile(empty, 'utf8')).toBe('external content');
+  });
   it('backs up the source before the first write', async () => {
     const file = await fixture();
     const service = new CustomerCsvService();
@@ -121,6 +177,8 @@ describe('CustomerCsvService', () => {
       await expect(service.load(bad)).rejects.toThrow();
       expect(service.customers()[0]?.id).toBe('001');
     }
+    const empty = await fixture('');
+    await expect(service.load(empty)).rejects.toThrow(/CSV file is empty/);
     const binary = await fixture();
     await writeFile(binary, Buffer.from([0xff, 0xfe, 0xfd]));
     await expect(service.load(binary)).rejects.toThrow(/valid UTF-8/);

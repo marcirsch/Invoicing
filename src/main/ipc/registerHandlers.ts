@@ -29,6 +29,11 @@ function safeFailure(error: unknown, fallback: string) {
         message: 'Some fields are invalid. Check the form and try again.',
       },
     };
+  if (error instanceof Error && /^CSV file is empty\./.test(error.message))
+    return {
+      ok: false,
+      error: { code: 'csv_empty', message: error.message },
+    };
   if (error instanceof Error && /delimiter is ambiguous/.test(error.message))
     return {
       ok: false,
@@ -55,7 +60,7 @@ function safeFailure(error: unknown, fallback: string) {
     };
   if (
     error instanceof Error &&
-    /^(Select a customer|Choose a customer|The customer CSV|CSV is missing|required columns|CSV contains duplicate|CSV customer records|This file is not valid|CSV content|CSV rows)/.test(
+    /^(Select a customer|Choose a customer|The customer CSV|The selected CSV|A CSV file already exists|CSV is missing|required columns|CSV contains duplicate|CSV customer records|This file is not valid|CSV content|CSV rows)/.test(
       error.message,
     )
   )

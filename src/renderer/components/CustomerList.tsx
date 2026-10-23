@@ -8,6 +8,9 @@ interface Props {
   onEdit(customer: Customer): void;
   onDelete(customer: Customer): void;
   onSelectCsv(): void;
+  onCreateCsv(): void;
+  canInitializeEmptyCsv: boolean;
+  onInitializeEmptyCsv(): void;
   onReload(): void;
 }
 export function CustomerList({
@@ -18,6 +21,9 @@ export function CustomerList({
   onEdit,
   onDelete,
   onSelectCsv,
+  onCreateCsv,
+  canInitializeEmptyCsv,
+  onInitializeEmptyCsv,
   onReload,
 }: Props): JSX.Element {
   const [query, setQuery] = useState('');
@@ -40,6 +46,9 @@ export function CustomerList({
           <p>{csvPath ?? 'Choose a CSV file to manage customers.'}</p>
         </div>
         <div className="button-row">
+          <button type="button" className="secondary" onClick={onCreateCsv}>
+            Create customer CSV…
+          </button>
           <button type="button" className="secondary" onClick={onSelectCsv}>
             Choose CSV…
           </button>
@@ -56,6 +65,17 @@ export function CustomerList({
           </button>
         </div>
       </div>
+      {canInitializeEmptyCsv && (
+        <div className="empty-state" role="status">
+          <p>
+            The selected customer CSV is empty. Initialize it with the standard
+            customer columns to start adding customers.
+          </p>
+          <button type="button" onClick={onInitializeEmptyCsv}>
+            Initialize empty CSV
+          </button>
+        </div>
+      )}
       {csvPath && (
         <label className="search-field" htmlFor="customer-search">
           Search customers
