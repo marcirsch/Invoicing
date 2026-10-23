@@ -1,6 +1,13 @@
 import type { InvoiceDraft } from '../../shared/domain/invoice';
 import type { Customer } from '../../shared/domain/customer';
-import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { assignMeasuredPages } from '../invoice/assignMeasuredPages';
 import { resolvePageLines } from '../invoice/resolvePageLines';
 import { QrBillPreview } from './QrBillPreview';
@@ -62,6 +69,8 @@ function InvoiceWorkspaceContent({
 }): JSX.Element {
   const total = calculateInvoiceTotal(draft.lines);
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewViewportRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
   const rowHeights = useRef(new Map<string, number>());
   const [pageLineIds, setPageLineIds] = useState([
     draft.lines.map((line) => line.id),
@@ -105,6 +114,27 @@ function InvoiceWorkspaceContent({
       (field !== 'description' ? issueFor(`lines.${index}`) : undefined)
     );
   };
+  useLayoutEffect(() => {
+    if (printOnly) return;
+    const viewport = previewViewportRef.current;
+    if (!viewport) return;
+    const updateScale = () => {
+      // CSS defines 1in as 96px; convert the A4 width to CSS pixels.
+      const styles = window.getComputedStyle(viewport);
+      const horizontalPadding =
+        Number.parseFloat(styles.paddingLeft) +
+        Number.parseFloat(styles.paddingRight);
+      const availableWidth = viewport.clientWidth - horizontalPadding;
+      const nextScale = Math.min(1, availableWidth / ((210 * 96) / 25.4));
+      setPreviewScale((current) =>
+        Math.abs(current - nextScale) < 0.001 ? current : nextScale,
+      );
+    };
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [printOnly]);
   useLayoutEffect(() => {
     if (
       !issueAttempted ||
@@ -165,14 +195,14 @@ function InvoiceWorkspaceContent({
     const measure = () => {
       const paper = root.querySelector<HTMLElement>('.invoice-page');
       if (!paper) return;
-      const paperHeight = paper.getBoundingClientRect().height;
+      const paperHeight = paper.offsetHeight;
       const firstPage = root.querySelector<HTMLElement>('.invoice-page');
       if (!firstPage) return;
       const innerHeight = paperHeight * (1 - 0.072 * 2);
       const regionHeight = (selector: string, page: HTMLElement | null) =>
         page
           ? Array.from(page.querySelectorAll<HTMLElement>(selector)).reduce(
-              (sum, item) => sum + item.getBoundingClientRect().height,
+              (sum, item) => sum + item.offsetHeight,
               0,
             )
           : 0;
@@ -181,7 +211,7 @@ function InvoiceWorkspaceContent({
         firstPage,
       );
       const tableHeadingHeight =
-        firstPage.querySelector('thead')?.getBoundingClientRect().height ?? 0;
+        firstPage.querySelector('thead')?.offsetHeight ?? 0;
       const closingPage =
         Array.from(root.querySelectorAll<HTMLElement>('.invoice-page')).at(
           -1,
@@ -221,10 +251,7 @@ function InvoiceWorkspaceContent({
     root
       .querySelectorAll<HTMLElement>('[data-line-id]')
       .forEach((row) =>
-        rowHeights.current.set(
-          row.dataset.lineId!,
-          row.getBoundingClientRect().height,
-        ),
+        rowHeights.current.set(row.dataset.lineId!, row.offsetHeight),
       );
     measure();
     const observer = new ResizeObserver(measure);
@@ -281,32 +308,6 @@ function InvoiceWorkspaceContent({
               Open Settings
             </button>
           </p>
-        )}
-        {onIssue && (
-          <div className="issue-controls">
-            <button
-              type="button"
-              disabled={issuing}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Issue this invoice now? The issued PDF and snapshot are permanent.',
-                  )
-                ) {
-                  setAttemptedDraftId(draft.id);
-                  setFocusAttempt((attempt) => attempt + 1);
-                  if (draft.lines.length === 0) {
-                    focusInsertedRow.current = true;
-                    onAddLine();
-                    return;
-                  }
-                  if (validateIssueDraft(draft).valid) onIssue();
-                }
-              }}
-            >
-              {issuing ? 'Issuing…' : 'Issue invoice'}
-            </button>
-          </div>
         )}
         <div className="form-grid">
           <label className="field">
@@ -604,249 +605,316 @@ function InvoiceWorkspaceContent({
             onChange={(event) => onChange({ notes: event.target.value })}
           />
         </label>
-      </section>
-      <div
-        className="invoice-pages"
-        aria-label="Invoice preview"
-        ref={previewRef}
-      >
-        {(footerTooTall || oversizedLineIds.length > 0) && (
-          <div className="invoice-layout-warning" role="alert">
-            {footerTooTall && (
-              <p>
-                The invoice footer is too tall to fit in the page footer area.
-              </p>
-            )}
-            {oversizedLineIds.length > 0 && (
-              <p>
-                One or more service rows are taller than the available page area
-                and may not fit without splitting.
-              </p>
-            )}
+        {onIssue && (
+          <div className="issue-action-bar">
+            <div className="issue-action-context" aria-live="polite">
+              <strong>Invoice {draft.suggestedNumber}</strong>
+              <span>
+                {total.valid
+                  ? formatCurrency(total.amount, draft.currency)
+                  : `Total unavailable · ${draft.currency}`}
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={issuing}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Issue this invoice now? The issued PDF and snapshot are permanent.',
+                  )
+                ) {
+                  setAttemptedDraftId(draft.id);
+                  setFocusAttempt((attempt) => attempt + 1);
+                  if (draft.lines.length === 0) {
+                    focusInsertedRow.current = true;
+                    onAddLine();
+                    return;
+                  }
+                  if (validateIssueDraft(draft).valid) onIssue();
+                }
+              }}
+            >
+              {issuing ? 'Issuing…' : 'Issue invoice'}
+            </button>
           </div>
         )}
-        {pageLines.map((lines, pageIndex) => (
-          <section
-            key={pageIndex}
-            className={`invoice-paper invoice-page ${draft.template}`}
-            aria-label={`Invoice preview page ${pageIndex + 1}`}
-          >
-            {pageIndex === 0 && (
-              <header className="invoice-fixed">
-                <div>
-                  {pageIndex === 0 && (
-                    <div className="invoice-logo-space">
-                      {settingsLogo(draft.sender.logoDataUrl) && (
-                        <img
-                          className="invoice-logo"
-                          src={settingsLogo(draft.sender.logoDataUrl)!}
-                          alt="Company logo"
-                        />
+      </section>
+      <div
+        className="invoice-preview-viewport"
+        ref={previewViewportRef}
+        style={
+          { '--preview-scale': printOnly ? 1 : previewScale } as CSSProperties
+        }
+      >
+        <div
+          className="invoice-pages"
+          aria-label="Invoice preview"
+          ref={previewRef}
+          style={{ gap: `${16 * (printOnly ? 1 : previewScale)}px` }}
+        >
+          {(footerTooTall || oversizedLineIds.length > 0) && (
+            <div className="invoice-layout-warning" role="alert">
+              {footerTooTall && (
+                <p>
+                  The invoice footer is too tall to fit in the page footer area.
+                </p>
+              )}
+              {oversizedLineIds.length > 0 && (
+                <p>
+                  One or more service rows are taller than the available page
+                  area and may not fit without splitting.
+                </p>
+              )}
+            </div>
+          )}
+          {pageLines.map((lines, pageIndex) => (
+            <div
+              className="invoice-page-stage"
+              key={`stage-${pageIndex}`}
+              style={{
+                width: `${210 * (96 / 25.4) * (printOnly ? 1 : previewScale)}px`,
+                height: `${297 * (96 / 25.4) * (printOnly ? 1 : previewScale)}px`,
+              }}
+            >
+              <section
+                className={`invoice-paper invoice-page ${draft.template}`}
+                aria-label={`Invoice preview page ${pageIndex + 1}`}
+              >
+                {pageIndex === 0 && (
+                  <header className="invoice-fixed">
+                    <div>
+                      {pageIndex === 0 && (
+                        <div className="invoice-logo-space">
+                          {settingsLogo(draft.sender.logoDataUrl) && (
+                            <img
+                              className="invoice-logo"
+                              src={settingsLogo(draft.sender.logoDataUrl)!}
+                              alt="Company logo"
+                            />
+                          )}
+                        </div>
                       )}
+                      <strong className="invoice-sender-name">
+                        {draft.sender.name || 'Your company'}
+                      </strong>
+                      <p className="invoice-sender-details">
+                        {draft.sender.address.street}{' '}
+                        {draft.sender.address.buildingNumber}
+                        <br />
+                        {draft.sender.address.postalCode}{' '}
+                        {draft.sender.address.city}
+                        {draft.sender.address.country && (
+                          <>
+                            <br />
+                            {draft.sender.address.country}
+                          </>
+                        )}
+                        {draft.sender.phone && (
+                          <>
+                            <br />
+                            {draft.sender.phone}
+                          </>
+                        )}
+                        {draft.sender.email && (
+                          <>
+                            <br />
+                            {draft.sender.email}
+                          </>
+                        )}
+                        {draft.sender.website && (
+                          <>
+                            <br />
+                            {draft.sender.website}
+                          </>
+                        )}
+                        {draft.sender.iban && (
+                          <>
+                            <br />
+                            <b>IBAN: {draft.sender.iban}</b>
+                          </>
+                        )}
+                        {draft.sender.bankName && (
+                          <>
+                            <br />
+                            <b>Bank: {draft.sender.bankName}</b>
+                          </>
+                        )}
+                      </p>
                     </div>
-                  )}
-                  <strong className="invoice-sender-name">
-                    {draft.sender.name || 'Your company'}
-                  </strong>
-                  <p className="invoice-sender-details">
-                    {draft.sender.address.street}{' '}
-                    {draft.sender.address.buildingNumber}
-                    <br />
-                    {draft.sender.address.postalCode}{' '}
-                    {draft.sender.address.city}
-                    {draft.sender.address.country && (
-                      <>
-                        <br />
-                        {draft.sender.address.country}
-                      </>
-                    )}
-                    {draft.sender.phone && (
-                      <>
-                        <br />
-                        {draft.sender.phone}
-                      </>
-                    )}
-                    {draft.sender.email && (
-                      <>
-                        <br />
-                        {draft.sender.email}
-                      </>
-                    )}
-                    {draft.sender.website && (
-                      <>
-                        <br />
-                        {draft.sender.website}
-                      </>
-                    )}
-                    {draft.sender.iban && (
-                      <>
-                        <br />
-                        <b>IBAN: {draft.sender.iban}</b>
-                      </>
-                    )}
-                    {draft.sender.bankName && (
-                      <>
-                        <br />
-                        <b>Bank: {draft.sender.bankName}</b>
-                      </>
-                    )}
-                  </p>
-                </div>
-                <div className="invoice-recipient-block">
-                  <div className="preview-customer">
-                    <PreviewTarget
-                      fieldId="invoice-customer"
-                      label="Select invoice customer"
-                      printOnly={printOnly}
-                    >
-                      <strong>{draft.customer?.name ?? 'Customer'}</strong>
-                    </PreviewTarget>
-                    <p>
-                      {draft.customer?.address.street}{' '}
-                      {draft.customer?.address.buildingNumber}
-                      <br />
-                      {draft.customer?.address.postalCode}{' '}
-                      {draft.customer?.address.city}
-                      {draft.customer?.email && (
-                        <>
+                    <div className="invoice-recipient-block">
+                      <div className="preview-customer">
+                        <PreviewTarget
+                          fieldId="invoice-customer"
+                          label="Select invoice customer"
+                          printOnly={printOnly}
+                        >
+                          <strong>{draft.customer?.name ?? 'Customer'}</strong>
+                        </PreviewTarget>
+                        <p>
+                          {draft.customer?.address.street}{' '}
+                          {draft.customer?.address.buildingNumber}
                           <br />
-                          {draft.customer.email}
-                        </>
-                      )}
-                      {draft.customer?.phone && (
-                        <>
-                          <br />
-                          {draft.customer.phone}
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </header>
-            )}
-            {pageIndex === 0 && (
-              <section className="invoice-fixed invoice-heading-block">
-                <h2>RECHNUNG</h2>
-                <div className="invoice-meta-grid">
-                  <strong>Rechnungsdatum</strong>
-                  <PreviewTarget
-                    fieldId="invoice-date"
-                    label="Invoice date"
-                    printOnly={printOnly}
-                  >
-                    <strong>{formatInvoiceDate(draft.invoiceDate)}</strong>
-                  </PreviewTarget>
-                  <strong>Zahlbar bis</strong>
-                  <PreviewTarget
-                    fieldId="due-date"
-                    label="Due date"
-                    printOnly={printOnly}
-                  >
-                    <strong>{formatInvoiceDate(draft.dueDate)}</strong>
-                  </PreviewTarget>
-                  <strong>Rechnungsnummer</strong>
-                  <PreviewTarget
-                    fieldId="invoice-number"
-                    label="Invoice number"
-                    printOnly={printOnly}
-                  >
-                    <strong>{draft.suggestedNumber}</strong>
-                  </PreviewTarget>
-                </div>
-              </section>
-            )}
-            <table>
-              <thead>
-                <tr>
-                  <th>POS.</th>
-                  <th>BESCHREIBUNG</th>
-                  <th>DATUM</th>
-                  <th>STUNDEN</th>
-                  <th>{draft.currency}/STD</th>
-                  <th>PREIS IN {draft.currency}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line) => {
-                  const value = calculateLineAmount(line.hours, line.rate);
-                  return (
-                    <tr
-                      key={line.id}
-                      data-line-id={line.id}
-                      ref={(node) => {
-                        if (node)
-                          rowHeights.current.set(
-                            line.id,
-                            node.getBoundingClientRect().height,
-                          );
-                      }}
-                    >
-                      <td className="invoice-position-cell">
-                        {draft.lines.findIndex((item) => item.id === line.id) +
-                          1}
-                        .
-                      </td>
-                      <td>
-                        <PreviewTarget
-                          fieldId={`line-${line.id}-description`}
-                          label={`Edit description for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
-                          printOnly={printOnly}
-                        >
-                          {line.description || 'Service'}
-                        </PreviewTarget>
-                      </td>
-                      <td>{formatInvoiceDate(draft.invoiceDate)}</td>
-                      <td className="invoice-number-cell">
-                        <PreviewTarget
-                          fieldId={`line-${line.id}-hours`}
-                          label={`Edit hours for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
-                          printOnly={printOnly}
-                        >
-                          {line.hours}
-                        </PreviewTarget>
-                      </td>
-                      <td className="invoice-number-cell">
-                        <PreviewTarget
-                          fieldId={`line-${line.id}-rate`}
-                          label={`Edit rate for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
-                          printOnly={printOnly}
-                        >
-                          {line.rate} {draft.currency}
-                        </PreviewTarget>
-                      </td>
-                      <td className="invoice-number-cell">
-                        {value.valid
-                          ? `${formatInvoiceAmount(value.amount?.toNumber() ?? 0)} ${draft.currency}`
-                          : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {pageIndex === pageLines.length - 1 && (
-              <>
-                <div className="preview-total invoice-fixed">
-                  <strong>Gesamt total</strong>
-                  <strong>
-                    {total.valid
-                      ? `${formatInvoiceAmount(total.amount?.toNumber() ?? 0)} ${draft.currency}`
-                      : '—'}
-                  </strong>
-                </div>
-                {draft.notes && (
-                  <p className="invoice-fixed invoice-notes">{draft.notes}</p>
+                          {draft.customer?.address.postalCode}{' '}
+                          {draft.customer?.address.city}
+                          {draft.customer?.email && (
+                            <>
+                              <br />
+                              {draft.customer.email}
+                            </>
+                          )}
+                          {draft.customer?.phone && (
+                            <>
+                              <br />
+                              {draft.customer.phone}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </header>
                 )}
-              </>
-            )}
-            {draft.invoiceFooter && (
-              <footer className="invoice-footer">{draft.invoiceFooter}</footer>
-            )}
-          </section>
-        ))}
-        {!printOnly && (
-          <QrBillPreview draft={draft} invoiceNumber={draft.suggestedNumber} />
-        )}
+                {pageIndex === 0 && (
+                  <section className="invoice-fixed invoice-heading-block">
+                    <h2>RECHNUNG</h2>
+                    <div className="invoice-meta-grid">
+                      <strong>Rechnungsdatum</strong>
+                      <PreviewTarget
+                        fieldId="invoice-date"
+                        label="Invoice date"
+                        printOnly={printOnly}
+                      >
+                        <strong>{formatInvoiceDate(draft.invoiceDate)}</strong>
+                      </PreviewTarget>
+                      <strong>Zahlbar bis</strong>
+                      <PreviewTarget
+                        fieldId="due-date"
+                        label="Due date"
+                        printOnly={printOnly}
+                      >
+                        <strong>{formatInvoiceDate(draft.dueDate)}</strong>
+                      </PreviewTarget>
+                      <strong>Rechnungsnummer</strong>
+                      <PreviewTarget
+                        fieldId="invoice-number"
+                        label="Invoice number"
+                        printOnly={printOnly}
+                      >
+                        <strong>{draft.suggestedNumber}</strong>
+                      </PreviewTarget>
+                    </div>
+                  </section>
+                )}
+                <table>
+                  <thead>
+                    <tr>
+                      <th>POS.</th>
+                      <th>BESCHREIBUNG</th>
+                      <th>DATUM</th>
+                      <th>STUNDEN</th>
+                      <th>{draft.currency}/STD</th>
+                      <th>PREIS IN {draft.currency}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((line) => {
+                      const value = calculateLineAmount(line.hours, line.rate);
+                      return (
+                        <tr
+                          key={line.id}
+                          data-line-id={line.id}
+                          ref={(node) => {
+                            if (node)
+                              rowHeights.current.set(
+                                line.id,
+                                node.offsetHeight,
+                              );
+                          }}
+                        >
+                          <td className="invoice-position-cell">
+                            {draft.lines.findIndex(
+                              (item) => item.id === line.id,
+                            ) + 1}
+                            .
+                          </td>
+                          <td>
+                            <PreviewTarget
+                              fieldId={`line-${line.id}-description`}
+                              label={`Edit description for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
+                              printOnly={printOnly}
+                            >
+                              {line.description || 'Service'}
+                            </PreviewTarget>
+                          </td>
+                          <td>{formatInvoiceDate(draft.invoiceDate)}</td>
+                          <td className="invoice-number-cell">
+                            <PreviewTarget
+                              fieldId={`line-${line.id}-hours`}
+                              label={`Edit hours for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
+                              printOnly={printOnly}
+                            >
+                              {line.hours}
+                            </PreviewTarget>
+                          </td>
+                          <td className="invoice-number-cell">
+                            <PreviewTarget
+                              fieldId={`line-${line.id}-rate`}
+                              label={`Edit rate for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
+                              printOnly={printOnly}
+                            >
+                              {line.rate} {draft.currency}
+                            </PreviewTarget>
+                          </td>
+                          <td className="invoice-number-cell">
+                            {value.valid
+                              ? `${formatInvoiceAmount(value.amount?.toNumber() ?? 0)} ${draft.currency}`
+                              : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {pageIndex === pageLines.length - 1 && (
+                  <>
+                    <div className="preview-total invoice-fixed">
+                      <strong>Gesamt total</strong>
+                      <strong>
+                        {total.valid
+                          ? `${formatInvoiceAmount(total.amount?.toNumber() ?? 0)} ${draft.currency}`
+                          : '—'}
+                      </strong>
+                    </div>
+                    {draft.notes && (
+                      <p className="invoice-fixed invoice-notes">
+                        {draft.notes}
+                      </p>
+                    )}
+                  </>
+                )}
+                {draft.invoiceFooter && (
+                  <footer className="invoice-footer">
+                    {draft.invoiceFooter}
+                  </footer>
+                )}
+              </section>
+            </div>
+          ))}
+          {!printOnly && (
+            <div
+              className="invoice-page-stage qr-bill-stage"
+              style={{
+                width: `${210 * (96 / 25.4) * previewScale}px`,
+                height: `${105 * (96 / 25.4) * previewScale}px`,
+              }}
+            >
+              <QrBillPreview
+                draft={draft}
+                invoiceNumber={draft.suggestedNumber}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

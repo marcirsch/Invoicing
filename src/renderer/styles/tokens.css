@@ -2,6 +2,7 @@
   color-scheme: light dark;
   --surface: #ffffff;
   --surface-subtle: #f5f6f8;
+  --preview-well: #e9edf2;
   --text: #20252c;
   --muted: #66717d;
   --border: #dce1e6;
@@ -25,6 +26,7 @@
   color-scheme: dark;
   --surface: #1c2128;
   --surface-subtle: #262d36;
+  --preview-well: #262d36;
   --text: #edf1f5;
   --muted: #abb5c0;
   --border: #414a55;
@@ -38,6 +40,7 @@
     color-scheme: dark;
     --surface: #1c2128;
     --surface-subtle: #262d36;
+    --preview-well: #262d36;
     --text: #edf1f5;
     --muted: #abb5c0;
     --border: #414a55;
