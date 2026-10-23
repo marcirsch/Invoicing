@@ -4,23 +4,23 @@ Repository guidance for Codex and other coding agents working on the invoicing a
 
 ## Project Overview
 
-This repository is planning a local desktop invoicing app for a small Swiss service business. The app will edit invoices, manage customers through a human-readable CSV, preview multi-page output, and generate an archived PDF with a Swiss QR-bill as its last page.
+This repository contains a local desktop invoicing app for a small Swiss service business. The app edits invoices, manages customers through a human-readable CSV, previews multi-page output, and generates archived PDFs with a Swiss QR-bill as the final page.
 
-**Current state:** Phase 1 and Phase 2 are implemented. Phase 3 issuance code now includes shared issue validation, Chromium print rendering from the invoice preview, SwissQRBill/PDFKit, pdf-lib assembly, journaled archive storage, issue/replacement actions, and archive UI. Automated project checks pass, but visual invoice review, QR validator/scanner checks, recovery/failure workflows, and Windows verification remain outstanding; do not mark Phase 3 or Phase 4 release criteria complete until they are performed.
+**Current state:** Customer management, invoice drafting and preview, invoice issuance, replacement workflows, and archive UI are implemented. Issuance includes shared validation, Chromium print rendering, SwissQRBill/PDFKit generation, PDF assembly, and journaled archive storage. Automated checks pass, but visual invoice review, QR validator/scanner checks, recovery/failure workflows, and Windows verification remain outstanding; do not treat release readiness as established until these checks are completed.
 
-The product requirements and decisions are documented in [.codex/PRD.md](../.codex/PRD.md). The sample layout is [example_invoice.pdf](../example_invoice.pdf).
+Review [plans/](plans/) for the latest feature brief, plan, or other work in progress before starting a task. Identify the active document from its status and subject; plans may be historical or superseded. The current invoice editor UX brief is [invoice-editor-ux-prd.md](plans/invoice-editor-ux-prd.md) and is ready for implementation planning. Keep this `AGENTS.md` accurate as repository behavior, structure, commands, and conventions change. Both the user and agents should update it when their work changes the guidance future contributors need. The sample layout is [example_invoice.pdf](../example_invoice.pdf).
 
-## Implemented and Planned Tech Stack
+## Tech Stack
 
-| Technology | Planned purpose |
+| Technology | Purpose |
 |---|---|
-| Electron 44 | Local macOS and Windows desktop shell |
-| TypeScript 5, React 18, Electron Vite 5 | Phase 1 UI, process boundaries, and local services |
+| Electron 44 | Local desktop shell for macOS and Windows |
+| TypeScript 5, React 18, Electron Vite 5 | UI, process boundaries, and local services |
 | `zod` 3 | Runtime validation for settings and user input |
 | `decimal.js` 10.6 | Decimal-safe draft invoice line calculations |
 | `csv-parse` 7, `csv-stringify` 6 | Customer CSV parsing and serialization |
 | Vitest 4, ESLint 9, Prettier 3 | Tests, linting, and formatting |
-| HTML/CSS with Chromium | Future invoice preview and invoice PDF rendering |
+| HTML/CSS with Chromium | Invoice preview and invoice PDF rendering |
 | `swissqrbill` 4.4.1 with PDFKit 0.17.2 | QR-bill payment page (MIT, Node.js >=18; ESM PDF entry) |
 | `@cantoo/pdf-lib` 2.11.1 | QR-bill page assembly (actively maintained MIT fork, runtime-independent) |
 | User-selected CSV | Customer source of truth |
@@ -88,13 +88,14 @@ When implementing Electron, keep filesystem access in the main process, enable c
 
 ## Testing and Validation
 
-Phase 1 tests cover settings validation/persistence, customer validation, CSV dialect parsing and preservation, safe customer CRUD/conflict handling, and IPC sender/payload validation. Run `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build`, and `npm run smoke` before handing off Phase 1 work. The smoke test builds and launches Electron, then checks that the renderer and preload bridge initialize. Future-phase tests should cover invoice arithmetic and rounding, numbering and immutable archives, preview-to-editor focus mapping, theme behavior, multi-page PDF layout, and QR-bill payload/page order. Verify macOS and Windows packaging before release.
+The automated suite includes settings and draft persistence, customer validation and CSV handling, IPC security, invoice calculations and dates, issue validation, invoice page layout, QR-bill data/PDF generation, and archive storage. Run `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build`, and `npm run smoke` when validating implementation changes. The smoke test builds and launches Electron, then checks that the renderer and preload bridge initialize. Automated checks do not replace visual invoice review, QR validator/scanner checks, archive recovery/failure workflow checks, or macOS and Windows packaging verification before release.
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| [.codex/PRD.md](../.codex/PRD.md) | Product requirements, scope, architecture proposal, and acceptance criteria |
+| [plans/](plans/) | Current and historical feature briefs, plans, and work in progress; check status before choosing a guide |
+| [plans/invoice-editor-ux-prd.md](plans/invoice-editor-ux-prd.md) | Current invoice editor UX brief, ready for implementation planning |
 | [example_invoice.pdf](../example_invoice.pdf) | Visual reference for the current invoice |
 | [.codex/AGENTS-template.md](../.codex/AGENTS-template.md) | Template used to create this guidance |
 
