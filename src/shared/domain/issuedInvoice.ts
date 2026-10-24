@@ -34,6 +34,7 @@ export interface InvoiceArchiveEntry {
   invoiceNumber: string;
   customerLabel: string;
   issueDate: string;
+  dueDate: string;
   totalCents: string;
   currency: InvoiceCurrency;
   pdfAvailable: boolean;

@@ -22,7 +22,18 @@ describe('InvoiceArchiveStore', () => {
     await fixture.store.commit(fixture.record, fixture.pdfBytes);
 
     expect(await fixture.store.read(fixture.record.id)).toEqual(fixture.record);
-    expect((await fixture.store.list())[0]?.pdfAvailable).toBe(true);
+    expect(await fixture.store.list()).toMatchObject([
+      {
+        id: fixture.record.id,
+        invoiceNumber: fixture.record.invoiceNumber,
+        customerLabel: fixture.record.recipient.name,
+        issueDate: fixture.record.invoiceDate,
+        dueDate: fixture.record.dueDate,
+        totalCents: fixture.record.totalCents,
+        currency: fixture.record.currency,
+        pdfAvailable: true,
+      },
+    ]);
     await expect(
       fixture.store.commit(
         {

@@ -40,6 +40,7 @@ export class InvoiceArchiveStore {
         invoiceNumber: record.invoiceNumber,
         customerLabel: record.recipient.name,
         issueDate: record.invoiceDate,
+        dueDate: record.dueDate,
         totalCents: record.totalCents,
         currency: record.currency,
         pdfAvailable: await fs
