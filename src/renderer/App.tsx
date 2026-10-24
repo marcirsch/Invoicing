@@ -239,7 +239,10 @@ function MainApp(): JSX.Element {
       customer: record.recipient,
       customerId: record.recipient.id,
       sender: record.sender,
-      lines: structuredClone(record.lines),
+      lines: record.lines.map((line) => ({
+        ...structuredClone(line),
+        serviceDate: line.serviceDate ?? record.invoiceDate,
+      })),
       currency: record.currency,
       invoiceDate: new Date().toISOString().slice(0, 10),
       dueDate: record.dueDate,

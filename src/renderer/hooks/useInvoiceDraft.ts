@@ -159,6 +159,7 @@ export function useInvoiceDraft(
       description: previous?.description ?? '',
       hours: previous?.hours ?? '',
       rate: previous?.rate ?? '',
+      serviceDate: previous?.serviceDate ?? draft?.invoiceDate ?? '',
     };
     update({ lines: [...(draft?.lines ?? []), line] });
   }

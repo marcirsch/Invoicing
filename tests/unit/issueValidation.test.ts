@@ -102,6 +102,17 @@ describe('validateIssueDraft', () => {
       ]),
     );
   });
+  it('associates invalid service dates with the indexed row field', () => {
+    expect(
+      validateIssueDraft({
+        ...draft,
+        lines: [{ ...draft.lines[0]!, serviceDate: '2025-02-29' }],
+      }).issues,
+    ).toContainEqual({
+      field: 'lines.0.serviceDate',
+      message: 'Enter a valid service date.',
+    });
+  });
   it('rejects zero total and unsafe invoice numbers', () => {
     expect(
       validateIssueDraft({

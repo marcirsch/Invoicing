@@ -1,6 +1,52 @@
 import { describe, expect, it } from 'vitest';
 import { invoiceDraftSchema } from '../../src/shared/validation/invoiceValidation';
 describe('invoice draft validation', () => {
+  it('accepts legacy rows without service dates and validates present dates', () => {
+    const legacy = invoiceDraftSchema.parse({
+      id: '00000000-0000-4000-8000-000000000000',
+      invoiceDate: '2025-02-28',
+      dueDate: '2025-03-30',
+      currency: 'CHF',
+      suggestedNumber: '',
+      customerId: null,
+      customer: null,
+      sender: {
+        name: '',
+        address: {
+          street: '',
+          buildingNumber: '',
+          postalCode: '',
+          city: '',
+          country: '',
+        },
+        phone: '',
+        email: '',
+      },
+      lines: [
+        {
+          id: '00000000-0000-4000-8000-000000000001',
+          description: '',
+          hours: '',
+          rate: '',
+        },
+      ],
+      template: 'classic',
+      notes: '',
+    });
+    expect(legacy.lines[0]?.serviceDate).toBeUndefined();
+    expect(
+      invoiceDraftSchema.safeParse({
+        ...legacy,
+        lines: [{ ...legacy.lines[0], serviceDate: '2025-02-29' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      invoiceDraftSchema.safeParse({
+        ...legacy,
+        lines: [{ ...legacy.lines[0], serviceDate: '2024-02-29' }],
+      }).success,
+    ).toBe(true);
+  });
   it('allows unfinished editor fields while rejecting invalid dates', () => {
     const result = invoiceDraftSchema.safeParse({
       id: '00000000-0000-4000-8000-000000000000',

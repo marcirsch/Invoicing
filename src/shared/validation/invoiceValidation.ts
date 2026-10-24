@@ -47,6 +47,10 @@ export const invoiceDraftSchema = z.object({
         description: z.string().max(4000),
         hours: z.string().max(24),
         rate: z.string().max(24),
+        serviceDate: z
+          .string()
+          .refine(isIsoDate, 'Enter a valid service date.')
+          .optional(),
       }),
     )
     .max(500),

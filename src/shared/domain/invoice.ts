@@ -9,6 +9,8 @@ export interface InvoiceLineItem {
   description: string;
   hours: string;
   rate: string;
+  /** ISO calendar date; optional only for pre-service-date saved records. */
+  serviceDate?: string;
 }
 export interface InvoiceDraft {
   id: string;
@@ -26,5 +28,11 @@ export interface InvoiceDraft {
   dueDateMode: 'automatic' | 'manual';
 }
 export type InvoiceField =
-  'description' | 'hours' | 'rate' | 'invoiceDate' | 'dueDate' | 'customer';
+  | 'description'
+  | 'hours'
+  | 'rate'
+  | 'serviceDate'
+  | 'invoiceDate'
+  | 'dueDate'
+  | 'customer';
 export type InvoiceAddress = Address;

@@ -166,6 +166,11 @@ export function validateIssueDraft(
         field: `lines.${index}.description`,
         message: 'Enter a service description.',
       });
+    if (line.serviceDate !== undefined && !isIsoDate(line.serviceDate))
+      issues.push({
+        field: `lines.${index}.serviceDate`,
+        message: 'Enter a valid service date.',
+      });
     const amount = calculateLineAmount(line.hours, line.rate);
     if (!amount.valid || !amount.cents)
       issues.push({

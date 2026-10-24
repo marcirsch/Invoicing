@@ -55,11 +55,15 @@ describe('InvoiceIssuanceService', () => {
 
   it('returns the same archived invoice when retried by transaction ID', async () => {
     const fixture = await createFixture();
+    let renderedDate: string | undefined;
     const service = new InvoiceIssuanceService(
       fixture.settings,
       fixture.drafts,
       fixture.archive,
-      async () => new Uint8Array([1, 2, 3]),
+      async (invoice) => {
+        renderedDate = invoice.lines[0]?.serviceDate;
+        return new Uint8Array([1, 2, 3]);
+      },
     );
 
     const first = await service.issue(
@@ -76,6 +80,8 @@ describe('InvoiceIssuanceService', () => {
     );
 
     expect(retry).toEqual(first);
+    expect(first.lines[0]?.serviceDate).toBe(fixture.draft.invoiceDate);
+    expect(renderedDate).toBe(fixture.draft.invoiceDate);
     expect(await fixture.archive.list()).toHaveLength(1);
     await expect(fixture.drafts.load()).resolves.toBeNull();
     await expect(fixture.settings.load()).resolves.toMatchObject({

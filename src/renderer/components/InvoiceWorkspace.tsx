@@ -162,7 +162,7 @@ function InvoiceWorkspaceContent({
         item.field.startsWith('lines.'),
     )?.field;
     const lineMatch = first?.match(
-      /^lines\.(\d+)(?:\.(description|hours|rate))?$/,
+      /^lines\.(\d+)(?:\.(description|hours|rate|serviceDate))?$/,
     );
     const id = lineMatch
       ? `line-${draft.lines[Number(lineMatch[1])]?.id ?? ''}-${lineMatch[2] ?? 'hours'}`
@@ -452,6 +452,7 @@ function InvoiceWorkspaceContent({
           <table className="service-table">
             <colgroup>
               <col className="service-description-column" />
+              <col className="service-date-column" />
               <col className="service-hours-column" />
               <col className="service-rate-column" />
               <col className="service-amount-column" />
@@ -460,6 +461,7 @@ function InvoiceWorkspaceContent({
             <thead>
               <tr>
                 <th>Description</th>
+                <th>Service date</th>
                 <th>Hours</th>
                 <th>Rate</th>
                 <th>Amount</th>
@@ -501,6 +503,44 @@ function InvoiceWorkspaceContent({
                             className="visually-hidden"
                           >
                             {lineIssue(line.id, 'description')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="service-date-cell">
+                        <label
+                          className="visually-hidden"
+                          htmlFor={`line-${line.id}-service-date`}
+                        >
+                          Service date
+                        </label>
+                        <input
+                          id={`line-${line.id}-service-date`}
+                          type="date"
+                          value={line.serviceDate ?? draft.invoiceDate}
+                          aria-invalid={Boolean(
+                            lineIssue(line.id, 'serviceDate'),
+                          )}
+                          aria-describedby={
+                            lineIssue(line.id, 'serviceDate')
+                              ? `line-${line.id}-service-date-error`
+                              : undefined
+                          }
+                          onChange={(event) =>
+                            onChange({
+                              lines: draft.lines.map((item) =>
+                                item.id === line.id
+                                  ? { ...item, serviceDate: event.target.value }
+                                  : item,
+                              ),
+                            })
+                          }
+                        />
+                        {lineIssue(line.id, 'serviceDate') && (
+                          <span
+                            id={`line-${line.id}-service-date-error`}
+                            className="visually-hidden"
+                          >
+                            {lineIssue(line.id, 'serviceDate')}
                           </span>
                         )}
                       </td>
@@ -846,7 +886,17 @@ function InvoiceWorkspaceContent({
                               {line.description || 'Service'}
                             </PreviewTarget>
                           </td>
-                          <td>{formatInvoiceDate(draft.invoiceDate)}</td>
+                          <td>
+                            <PreviewTarget
+                              fieldId={`line-${line.id}-service-date`}
+                              label={`Edit service date for service ${draft.lines.findIndex((item) => item.id === line.id) + 1}`}
+                              printOnly={printOnly}
+                            >
+                              {formatInvoiceDate(
+                                line.serviceDate ?? draft.invoiceDate,
+                              )}
+                            </PreviewTarget>
+                          </td>
                           <td className="invoice-number-cell">
                             <PreviewTarget
                               fieldId={`line-${line.id}-hours`}

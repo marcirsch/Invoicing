@@ -109,7 +109,10 @@ export class InvoiceIssuanceService {
         currency: draft.currency,
         sender: structuredClone(draft.sender),
         recipient: structuredClone(draft.customer!),
-        lines: structuredClone(draft.lines),
+        lines: draft.lines.map((line) => ({
+          ...structuredClone(line),
+          serviceDate: line.serviceDate ?? draft.invoiceDate,
+        })),
         lineTotalsCents: lineTotals,
         totalCents: validation.totalCents,
         template: draft.template,
