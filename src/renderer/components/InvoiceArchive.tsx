@@ -1,9 +1,64 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import type {
   InvoiceArchiveEntry,
   IssuedInvoice,
 } from '../../shared/domain/issuedInvoice';
 import { groupInvoiceArchiveEntries } from './invoiceArchiveGrouping';
+
+function showArchiveActionsPopover(
+  popover: HTMLElement,
+  trigger: HTMLButtonElement,
+  onDismiss: () => void,
+): void {
+  popover.style.left = '0px';
+  popover.style.top = '0px';
+  popover.showPopover();
+
+  const positionPopover = () => {
+    if (!popover.matches(':popover-open')) return;
+
+    const triggerBounds = trigger.getBoundingClientRect();
+    const popoverBounds = popover.getBoundingClientRect();
+    const viewportPadding = 8;
+    const gap = 4;
+    const maxLeft = Math.max(
+      viewportPadding,
+      window.innerWidth - popoverBounds.width - viewportPadding,
+    );
+    let left = triggerBounds.right - popoverBounds.width;
+    if (left < viewportPadding) left = triggerBounds.left;
+    left = Math.min(Math.max(left, viewportPadding), maxLeft);
+
+    const maxTop = Math.max(
+      viewportPadding,
+      window.innerHeight - popoverBounds.height - viewportPadding,
+    );
+    let top = triggerBounds.bottom + gap;
+    if (top > maxTop) top = triggerBounds.top - popoverBounds.height - gap;
+    top = Math.min(Math.max(top, viewportPadding), maxTop);
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  };
+
+  const removePositionListeners = () => {
+    window.removeEventListener('scroll', positionPopover, true);
+    window.removeEventListener('resize', positionPopover);
+    popover.removeEventListener('toggle', handleToggle);
+  };
+  const handleToggle = () => {
+    if (!popover.matches(':popover-open')) {
+      if (popover.contains(document.activeElement)) trigger.focus();
+      removePositionListeners();
+      onDismiss();
+    }
+  };
+
+  positionPopover();
+  window.addEventListener('scroll', positionPopover, true);
+  window.addEventListener('resize', positionPopover);
+  popover.addEventListener('toggle', handleToggle);
+}
 
 export function InvoiceArchive({
   onReplace,
@@ -14,6 +69,17 @@ export function InvoiceArchive({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<IssuedInvoice | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [openActionsId, setOpenActionsId] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const closeOpenPopovers = () => {
+      document
+        .querySelectorAll<HTMLElement>('.archive-menu-content:popover-open')
+        .forEach((popover) => popover.hidePopover());
+    };
+
+    closeOpenPopovers();
+    return closeOpenPopovers;
+  }, []);
   async function refresh() {
     const result = await window.invoicing.listInvoices();
     if (result.ok) {
@@ -31,6 +97,26 @@ export function InvoiceArchive({
   useEffect(() => {
     void refresh();
   }, []);
+  useLayoutEffect(() => {
+    if (openActionsId === null) return;
+
+    const encodedId = encodeURIComponent(openActionsId);
+    const popover = document.getElementById(`archive-actions-${encodedId}`);
+    const trigger = document.getElementById(
+      `archive-actions-trigger-${encodedId}`,
+    ) as HTMLButtonElement | null;
+    if (!popover || !trigger) return;
+
+    showArchiveActionsPopover(popover, trigger, () => {
+      setOpenActionsId((currentId) =>
+        currentId === openActionsId ? null : currentId,
+      );
+    });
+
+    return () => {
+      if (popover.matches(':popover-open')) popover.hidePopover();
+    };
+  }, [openActionsId]);
 
   const groups = groupInvoiceArchiveEntries(entries, searchQuery);
   const visibleEntries = groups.flatMap((group) => group.entries);
@@ -111,6 +197,8 @@ export function InvoiceArchive({
                     {group.entries.map((entry) => {
                       sequence += 1;
                       const invoiceHeadingId = `archive-invoice-${entry.id}`;
+                      const actionsPopoverId = `archive-actions-${encodeURIComponent(entry.id)}`;
+                      const isActionsOpen = openActionsId === entry.id;
                       return (
                         <li className="archive-row-item" key={entry.id}>
                           <article
@@ -125,15 +213,25 @@ export function InvoiceArchive({
                             </span>
 
                             <div className="archive-row-identity">
-                              <h4
-                                className="archive-invoice-number"
-                                id={invoiceHeadingId}
-                              >
-                                {entry.invoiceNumber}
-                              </h4>
-                              <strong className="archive-customer-name">
-                                {entry.customerLabel}
-                              </strong>
+                              <div className="archive-identity-field">
+                                <span className="archive-field-label">
+                                  INVOICE
+                                </span>
+                                <h4
+                                  className="archive-invoice-number"
+                                  id={invoiceHeadingId}
+                                >
+                                  {entry.invoiceNumber}
+                                </h4>
+                              </div>
+                              <div className="archive-identity-field">
+                                <span className="archive-field-label">
+                                  CUSTOMER
+                                </span>
+                                <strong className="archive-customer-name">
+                                  {entry.customerLabel}
+                                </strong>
+                              </div>
                             </div>
 
                             <div className="archive-row-field">
@@ -180,37 +278,76 @@ export function InvoiceArchive({
                               >
                                 Open PDF
                               </button>
-                              <details className="archive-action-menu">
-                                <summary>Actions</summary>
-                                <div className="archive-menu-content">
-                                  <button
-                                    type="button"
-                                    className="secondary"
-                                    onClick={() => void showDetails(entry.id)}
+                              <div className="archive-action-menu">
+                                <button
+                                  type="button"
+                                  className="archive-actions-trigger"
+                                  id={`archive-actions-trigger-${encodeURIComponent(entry.id)}`}
+                                  aria-controls={
+                                    isActionsOpen ? actionsPopoverId : undefined
+                                  }
+                                  aria-expanded={isActionsOpen}
+                                  aria-label={`Actions for invoice ${entry.invoiceNumber}`}
+                                  onClick={() =>
+                                    setOpenActionsId((currentId) =>
+                                      currentId === entry.id ? null : entry.id,
+                                    )
+                                  }
+                                >
+                                  <span>Actions</span>
+                                  <svg
+                                    className="archive-actions-chevron"
+                                    aria-hidden="true"
+                                    viewBox="0 0 12 12"
                                   >
-                                    Details
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="secondary"
-                                    disabled={!entry.pdfAvailable}
-                                    onClick={() =>
-                                      void window.invoicing.revealInvoicePdf(
-                                        entry.id,
-                                      )
-                                    }
+                                    <path d="m2.5 4.5 3.5 3 3.5-3" />
+                                  </svg>
+                                </button>
+                                {isActionsOpen && (
+                                  <div
+                                    className="archive-menu-content"
+                                    id={actionsPopoverId}
+                                    {...({ popover: 'auto' } as Record<
+                                      string,
+                                      string
+                                    >)}
                                   >
-                                    Reveal PDF
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="secondary"
-                                    onClick={() => onReplace(entry.id)}
-                                  >
-                                    Create replacement
-                                  </button>
-                                </div>
-                              </details>
+                                    <button
+                                      type="button"
+                                      className="secondary"
+                                      onClick={() => {
+                                        setOpenActionsId(null);
+                                        void showDetails(entry.id);
+                                      }}
+                                    >
+                                      Details
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="secondary"
+                                      disabled={!entry.pdfAvailable}
+                                      onClick={() => {
+                                        setOpenActionsId(null);
+                                        void window.invoicing.revealInvoicePdf(
+                                          entry.id,
+                                        );
+                                      }}
+                                    >
+                                      Reveal PDF
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="secondary"
+                                      onClick={() => {
+                                        setOpenActionsId(null);
+                                        onReplace(entry.id);
+                                      }}
+                                    >
+                                      Create replacement
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </article>
                         </li>

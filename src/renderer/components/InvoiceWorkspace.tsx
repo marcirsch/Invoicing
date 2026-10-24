@@ -1,7 +1,6 @@
 import type { InvoiceDraft } from '../../shared/domain/invoice';
 import type { Customer } from '../../shared/domain/customer';
 import {
-  Fragment,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -111,8 +110,14 @@ function InvoiceWorkspaceContent({
     const index = draft.lines.findIndex((line) => line.id === lineId);
     return (
       issueFor(`lines.${index}.${field}`) ??
-      (field !== 'description' ? issueFor(`lines.${index}`) : undefined)
+      (field === 'hours' || field === 'rate'
+        ? issueFor(`lines.${index}`)
+        : undefined)
     );
+  };
+  const lineAmountIssue = (lineId: string) => {
+    const index = draft.lines.findIndex((line) => line.id === lineId);
+    return issueFor(`lines.${index}`);
   };
   useLayoutEffect(() => {
     if (printOnly) return;
@@ -164,8 +169,12 @@ function InvoiceWorkspaceContent({
     const lineMatch = first?.match(
       /^lines\.(\d+)(?:\.(description|hours|rate|serviceDate))?$/,
     );
+    const field =
+      lineMatch?.[2] === 'serviceDate'
+        ? 'service-date'
+        : (lineMatch?.[2] ?? 'hours');
     const id = lineMatch
-      ? `line-${draft.lines[Number(lineMatch[1])]?.id ?? ''}-${lineMatch[2] ?? 'hours'}`
+      ? `line-${draft.lines[Number(lineMatch[1])]?.id ?? ''}-${field}`
       : first === 'customer' || first?.startsWith('customer.')
         ? 'invoice-customer'
         : first === 'invoiceDate'
@@ -448,196 +457,207 @@ function InvoiceWorkspaceContent({
           </label>
         </div>
         <h3>Services</h3>
-        <div className="table-scroll service-table-scroll">
-          <table className="service-table">
-            <colgroup>
-              <col className="service-description-column" />
-              <col className="service-date-column" />
-              <col className="service-hours-column" />
-              <col className="service-rate-column" />
-              <col className="service-amount-column" />
-              <col className="service-action-column" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Service date</th>
-                <th>Hours</th>
-                <th>Rate</th>
-                <th>Amount</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {draft.lines.map((line) => {
-                const amount = calculateLineAmount(line.hours, line.rate);
-                return (
-                  <Fragment key={line.id}>
-                    <tr>
-                      <td className="service-description-cell">
-                        <input
-                          id={`line-${line.id}-description`}
-                          aria-invalid={Boolean(
-                            lineIssue(line.id, 'description'),
-                          )}
-                          aria-describedby={
-                            lineIssue(line.id, 'description')
-                              ? `line-${line.id}-description-error`
-                              : undefined
-                          }
-                          aria-label="Service description"
-                          value={line.description}
-                          onChange={(event) =>
-                            onChange({
-                              lines: draft.lines.map((item) =>
-                                item.id === line.id
-                                  ? { ...item, description: event.target.value }
-                                  : item,
-                              ),
-                            })
-                          }
-                        />
-                        {lineIssue(line.id, 'description') && (
-                          <span
-                            id={`line-${line.id}-description-error`}
-                            className="visually-hidden"
-                          >
-                            {lineIssue(line.id, 'description')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="service-date-cell">
-                        <label
-                          className="visually-hidden"
-                          htmlFor={`line-${line.id}-service-date`}
-                        >
-                          Service date
-                        </label>
-                        <input
-                          id={`line-${line.id}-service-date`}
-                          type="date"
-                          value={line.serviceDate ?? draft.invoiceDate}
-                          aria-invalid={Boolean(
-                            lineIssue(line.id, 'serviceDate'),
-                          )}
-                          aria-describedby={
-                            lineIssue(line.id, 'serviceDate')
-                              ? `line-${line.id}-service-date-error`
-                              : undefined
-                          }
-                          onChange={(event) =>
-                            onChange({
-                              lines: draft.lines.map((item) =>
-                                item.id === line.id
-                                  ? { ...item, serviceDate: event.target.value }
-                                  : item,
-                              ),
-                            })
-                          }
-                        />
-                        {lineIssue(line.id, 'serviceDate') && (
-                          <span
-                            id={`line-${line.id}-service-date-error`}
-                            className="visually-hidden"
-                          >
-                            {lineIssue(line.id, 'serviceDate')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="service-numeric-cell">
-                        <input
-                          id={`line-${line.id}-hours`}
-                          aria-invalid={Boolean(lineIssue(line.id, 'hours'))}
-                          aria-describedby={
-                            lineIssue(line.id, 'hours')
-                              ? `line-${line.id}-hours-error`
-                              : undefined
-                          }
-                          aria-label="Hours"
-                          inputMode="decimal"
-                          value={line.hours}
-                          onChange={(event) =>
-                            onChange({
-                              lines: draft.lines.map((item) =>
-                                item.id === line.id
-                                  ? { ...item, hours: event.target.value }
-                                  : item,
-                              ),
-                            })
-                          }
-                        />
-                        {lineIssue(line.id, 'hours') && (
-                          <span
-                            id={`line-${line.id}-hours-error`}
-                            className="visually-hidden"
-                          >
-                            {lineIssue(line.id, 'hours')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="service-numeric-cell">
-                        <input
-                          id={`line-${line.id}-rate`}
-                          aria-invalid={Boolean(lineIssue(line.id, 'rate'))}
-                          aria-describedby={
-                            lineIssue(line.id, 'rate')
-                              ? `line-${line.id}-rate-error`
-                              : undefined
-                          }
-                          aria-label="Rate"
-                          inputMode="decimal"
-                          value={line.rate}
-                          onChange={(event) =>
-                            onChange({
-                              lines: draft.lines.map((item) =>
-                                item.id === line.id
-                                  ? { ...item, rate: event.target.value }
-                                  : item,
-                              ),
-                            })
-                          }
-                        />
-                        {lineIssue(line.id, 'rate') && (
-                          <span
-                            id={`line-${line.id}-rate-error`}
-                            className="visually-hidden"
-                          >
-                            {lineIssue(line.id, 'rate')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="service-amount-cell">
-                        {amount.valid
-                          ? formatCurrency(amount.amount, draft.currency)
-                          : '—'}
-                      </td>
-                      <td className="service-action-cell">
-                        <button
-                          type="button"
-                          className="danger service-remove-button"
-                          aria-label="Remove service row"
-                          onClick={() =>
-                            onChange({
-                              lines: draft.lines.filter(
-                                (item) => item.id !== line.id,
-                              ),
-                            })
-                          }
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="service-card-list">
+          {draft.lines.map((line, index) => {
+            const amount = calculateLineAmount(line.hours, line.rate);
+            const descriptionError = lineIssue(line.id, 'description');
+            const serviceDateError = lineIssue(line.id, 'serviceDate');
+            const amountError = lineAmountIssue(line.id);
+            const hoursFieldError = issueFor(`lines.${index}.hours`);
+            const rateFieldError = issueFor(`lines.${index}.rate`);
+            const hoursError = hoursFieldError ?? amountError;
+            const rateError = rateFieldError ?? amountError;
+            const rowErrorId = `line-${line.id}-amount-error`;
+
+            return (
+              <fieldset className="service-card" key={line.id}>
+                <legend>
+                  <span className="service-card-index" aria-hidden="true">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  Service {index + 1}
+                </legend>
+                <button
+                  type="button"
+                  className="danger service-remove-button"
+                  aria-label={`Remove service ${index + 1}`}
+                  onClick={() =>
+                    onChange({
+                      lines: draft.lines.filter((item) => item.id !== line.id),
+                    })
+                  }
+                >
+                  Remove
+                </button>
+                <div className="service-card-field service-description-field">
+                  <label htmlFor={`line-${line.id}-description`}>
+                    Description
+                  </label>
+                  <textarea
+                    id={`line-${line.id}-description`}
+                    className="service-description-input"
+                    rows={2}
+                    aria-invalid={Boolean(descriptionError)}
+                    aria-describedby={
+                      descriptionError
+                        ? `line-${line.id}-description-error`
+                        : undefined
+                    }
+                    value={line.description}
+                    onChange={(event) =>
+                      onChange({
+                        lines: draft.lines.map((item) =>
+                          item.id === line.id
+                            ? { ...item, description: event.target.value }
+                            : item,
+                        ),
+                      })
+                    }
+                  />
+                  {descriptionError && (
+                    <span
+                      id={`line-${line.id}-description-error`}
+                      className="field-error"
+                    >
+                      {descriptionError}
+                    </span>
+                  )}
+                </div>
+                <div className="service-card-fields">
+                  <div className="service-card-field">
+                    <label htmlFor={`line-${line.id}-service-date`}>
+                      Service date
+                    </label>
+                    <input
+                      id={`line-${line.id}-service-date`}
+                      type="date"
+                      value={line.serviceDate ?? draft.invoiceDate}
+                      aria-invalid={Boolean(serviceDateError)}
+                      aria-describedby={
+                        serviceDateError
+                          ? `line-${line.id}-service-date-error`
+                          : undefined
+                      }
+                      onChange={(event) =>
+                        onChange({
+                          lines: draft.lines.map((item) =>
+                            item.id === line.id
+                              ? { ...item, serviceDate: event.target.value }
+                              : item,
+                          ),
+                        })
+                      }
+                    />
+                    {serviceDateError && (
+                      <span
+                        id={`line-${line.id}-service-date-error`}
+                        className="field-error"
+                      >
+                        {serviceDateError}
+                      </span>
+                    )}
+                  </div>
+                  <div className="service-card-field">
+                    <label htmlFor={`line-${line.id}-hours`}>Hours</label>
+                    <input
+                      id={`line-${line.id}-hours`}
+                      aria-invalid={Boolean(hoursError)}
+                      aria-describedby={
+                        hoursFieldError
+                          ? `line-${line.id}-hours-error`
+                          : amountError
+                            ? rowErrorId
+                            : undefined
+                      }
+                      inputMode="decimal"
+                      value={line.hours}
+                      onChange={(event) =>
+                        onChange({
+                          lines: draft.lines.map((item) =>
+                            item.id === line.id
+                              ? { ...item, hours: event.target.value }
+                              : item,
+                          ),
+                        })
+                      }
+                    />
+                    {hoursFieldError && (
+                      <span
+                        id={`line-${line.id}-hours-error`}
+                        className="field-error"
+                      >
+                        {hoursFieldError}
+                      </span>
+                    )}
+                  </div>
+                  <div className="service-card-field">
+                    <label htmlFor={`line-${line.id}-rate`}>
+                      Rate ({draft.currency}/hour)
+                    </label>
+                    <input
+                      id={`line-${line.id}-rate`}
+                      aria-invalid={Boolean(rateError)}
+                      aria-describedby={
+                        rateFieldError
+                          ? `line-${line.id}-rate-error`
+                          : amountError
+                            ? rowErrorId
+                            : undefined
+                      }
+                      inputMode="decimal"
+                      value={line.rate}
+                      onChange={(event) =>
+                        onChange({
+                          lines: draft.lines.map((item) =>
+                            item.id === line.id
+                              ? { ...item, rate: event.target.value }
+                              : item,
+                          ),
+                        })
+                      }
+                    />
+                    {rateFieldError && (
+                      <span
+                        id={`line-${line.id}-rate-error`}
+                        className="field-error"
+                      >
+                        {rateFieldError}
+                      </span>
+                    )}
+                  </div>
+                  <div className="service-card-amount">
+                    <span>Amount</span>
+                    <output
+                      aria-label={`Amount for service ${index + 1}`}
+                      htmlFor={`line-${line.id}-hours line-${line.id}-rate`}
+                    >
+                      {amount.valid
+                        ? formatCurrency(amount.amount, draft.currency)
+                        : '—'}
+                    </output>
+                  </div>
+                  {amountError && (
+                    <p id={rowErrorId} className="service-card-row-error">
+                      {amountError}
+                    </p>
+                  )}
+                </div>
+              </fieldset>
+            );
+          })}
         </div>
-        <div className="invoice-add-row-gap" />
-        <button type="button" className="secondary" onClick={onAddLine}>
-          Add row
-        </button>
+        <div className="service-add-row">
+          <button
+            type="button"
+            className="secondary service-add-button"
+            onClick={onAddLine}
+          >
+            <span className="service-add-plus" aria-hidden="true">
+              +
+            </span>
+            Add service
+          </button>
+        </div>
         <label className="field">
           Notes
           <textarea
