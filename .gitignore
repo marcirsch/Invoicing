@@ -4,3 +4,4 @@ release/
 dist/
 e2e-screenshots/
 example_invoice.pdf
+tests/archives/
