@@ -320,10 +320,6 @@ function MainApp(): JSX.Element {
           error={settings.error}
           onChange={settings.setSettings}
           onSave={saveSettings}
-          onSelectCsv={() => void chooseCsv()}
-          onCreateCsv={() => void createCustomerCsv()}
-          canInitializeEmptyCsv={customerState.errorCode === 'csv_empty'}
-          onInitializeEmptyCsv={() => void initializeEmptyCustomerCsv()}
           onSelectArchive={() => void chooseArchive()}
           onSelectLogo={() => void chooseLogo()}
         />

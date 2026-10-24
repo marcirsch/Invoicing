@@ -254,15 +254,15 @@ The renderer-to-issue boundary continues to carry the selected invoice number wi
 
 ### Phase 4: Consolidate CSV controls and regression review
 
-**Status:** Not implemented.
+**Status:** Complete (2026-10-24).
 
 **Goal:** Make Customers the only place to select or create a customer CSV and verify end-to-end behavior.
 
-- [ ] Remove CSV actions and initialization prompts from Settings while preserving archive-folder settings.
-- [ ] Verify the Customers CSV workflows and read-only path display in Settings.
-- [ ] Run repository checks and perform a complete invoice creation/issue workflow.
+- [x] Remove CSV actions and initialization prompts from Settings while preserving archive-folder settings.
+- [x] Verify the Customers CSV workflows and read-only path display in Settings.
+- [x] Run repository checks and perform a complete invoice creation/issue workflow.
 
-**Validation:** Existing CSV integration tests, typecheck, lint, format check, unit/integration tests, build, smoke run, and manual Electron checks pass.  
+**Validation:** The focused CSV/settings integration tests (14 tests), full test suite (81 tests), typecheck, lint, format check, build, and isolated Electron smoke run passed. Manual macOS Electron checks covered CSV creation and selection, cancellation, empty-file initialization, delimiter ambiguity and recovery feedback, read-only Settings path, archive-folder selection, saving unrelated settings, and a complete disposable invoice issuance with archived PDF.
 **Estimate:** 0.5–1 engineering day.
 
 ### Phase 5: Restore service dates on invoice rows
