@@ -33,6 +33,7 @@ export async function renderInvoicePdf(
     );
     const pdf = await window.webContents.printToPDF({
       pageSize: 'A4',
+      landscape: false,
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
       printBackground: true,
       preferCSSPageSize: true,

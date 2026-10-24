@@ -711,7 +711,7 @@ td {
 }
 @media print {
   @page {
-    size: A4;
+    size: A4 portrait;
     margin: 0;
   }
   .print-only.invoice-workspace {
@@ -725,6 +725,12 @@ td {
   }
   .print-only .invoice-page-stage {
     display: contents;
+  }
+  .print-only .invoice-page-stage > .invoice-page {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none !important;
   }
   .print-only .invoice-preview-viewport {
     padding: 0;
@@ -743,6 +749,7 @@ td {
     display: none !important;
   }
   body:has(.print-only) main {
+    width: 100%;
     max-width: none;
     margin: 0;
     padding: 0;

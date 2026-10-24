@@ -68,13 +68,29 @@ describe('QR-bill PDF adapter', () => {
     const billSize = qr.getPage(0)!.getSize();
     expect(billSize.width).toBeGreaterThan(500);
     expect(billSize.height).toBeGreaterThan(800);
+    expect(billSize.width).toBeLessThan(billSize.height);
     const invoicePdf = await PDFDocument.create();
-    invoicePdf.addPage([595.28, 841.89]);
-    invoicePdf.addPage([595.28, 841.89]);
+    const invoicePageSize = [595.28, 841.89] as const;
+    invoicePdf.addPage([...invoicePageSize]);
+    invoicePdf.addPage([...invoicePageSize]);
     const assembled = await appendQrBillPage(await invoicePdf.save(), qrBytes);
     expect(assembled).toMatchObject({ invoicePageCount: 2, totalPageCount: 3 });
     const output = await PDFDocument.load(assembled.bytes);
     expect(output.getPageCount()).toBe(3);
+    expect(output.getPage(0)!.getSize()).toEqual({
+      width: invoicePageSize[0],
+      height: invoicePageSize[1],
+    });
+    expect(output.getPage(0)!.getSize().width).toBeLessThan(
+      output.getPage(0)!.getSize().height,
+    );
+    expect(output.getPage(1)!.getSize()).toEqual({
+      width: invoicePageSize[0],
+      height: invoicePageSize[1],
+    });
+    expect(output.getPage(1)!.getSize().width).toBeLessThan(
+      output.getPage(1)!.getSize().height,
+    );
     expect(output.getPage(2)!.getSize()).toEqual(billSize);
   });
 });
